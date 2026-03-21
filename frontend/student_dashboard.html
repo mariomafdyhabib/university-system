@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <title>Student Dashboard - AI College Scheduler</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+
+<body class="dashboard-body">
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <div class="logo-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+          </svg>
+        </div>
+        <div>
+          <h1>Student</h1>
+          <p>AI College Scheduler</p>
+        </div>
+      </div>
+      <nav class="sidebar-nav">
+        <button class="nav-item active" data-section="courses-section">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+          </svg>
+          Courses
+        </button>
+        <button class="nav-item" data-section="schedule-section">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+            <line x1="16" y1="2" x2="16" y2="6"></line>
+            <line x1="8" y1="2" x2="8" y2="6"></line>
+            <line x1="3" y1="10" x2="21" y2="10"></line>
+          </svg>
+          Schedule
+        </button>
+        <button class="nav-item" data-section="exports-section">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="7 10 12 15 17 10"></polyline>
+            <line x1="12" y1="15" x2="12" y2="3"></line>
+          </svg>
+          Exports
+        </button>
+        <button class="nav-item" data-section="recommendations-section">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polygon
+              points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2">
+            </polygon>
+          </svg>
+          Recommendations
+        </button>
+      </nav>
+      <div class="sidebar-footer">
+        <button id="logout-btn" class="secondary">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+            <polyline points="16 17 21 12 16 7"></polyline>
+            <line x1="21" y1="12" x2="9" y2="12"></line>
+          </svg>
+          Logout
+        </button>
+      </div>
+    </aside>
+
+    <main class="main-content">
+      <section id="courses-section" class="content-section active">
+        <header class="section-header">
+          <div>
+            <h2>Course Selection</h2>
+            <p id="dashboard-course-count" class="text-muted">Loading your status...</p>
+          </div>
+          <button id="generate-schedule-btn" class="primary">Generate AI Schedule</button>
+        </header>
+        <div class="two-column">
+          <div class="panel">
+            <h3 style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+              Available Courses
+              <input type="text" id="course-search-input" placeholder="Search by name..."
+                style="padding: 0.4rem 0.8rem; border-radius: var(--radius); border: 1px solid var(--border); background: var(--surface); color: white; outline: none; width: 200px; font-size: 0.9rem;">
+            </h3>
+            <div id="courses-list" class="list"></div>
+          </div>
+          <div class="panel">
+            <h3>Selected Courses</h3>
+            <div id="selected-courses-list" class="list"></div>
+          </div>
+        </div>
+      </section>
+
+      <section id="schedule-section" class="content-section">
+        <header class="section-header">
+          <div>
+            <h2>Weekly Timetable</h2>
+            <p class="text-muted">Interactive drag-and-drop schedule management.</p>
+          </div>
+          <div style="display: flex; gap: 0.5rem;">
+            <button id="clear-schedule-btn" class="secondary" style="color: var(--error);">Clear Schedule</button>
+            <button id="refresh-schedule-btn" class="secondary">Refresh</button>
+          </div>
+        </header>
+        <div class="panel">
+          <div id="timetable" class="timetable"></div>
+          <p class="hint-text">
+            <strong>Pro Tip:</strong> Drag a course block to explore alternative timings. The system will prevent
+            conflicts automatically.
+          </p>
+        </div>
+      </section>
+
+      <section id="exports-section" class="content-section">
+        <header class="section-header">
+          <h2>Export Your Schedule</h2>
+        </header>
+        <div class="panel">
+          <p style="margin-bottom: 2rem;">Download your schedule in your preferred format to keep it handy or share with
+            others.</p>
+          <div style="display: flex; gap: 1rem;">
+            <button id="export-pdf-btn" class="primary">
+              <svg style="margin-right: 8px; width: 16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                stroke-width="2">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                <polyline points="14 2 14 8 20 8"></polyline>
+                <line x1="16" y1="13" x2="8" y2="13"></line>
+                <line x1="16" y1="17" x2="8" y2="17"></line>
+                <polyline points="10 9 9 9 8 9"></polyline>
+              </svg>
+              Download PDF
+            </button>
+            <button id="export-excel-btn" class="secondary">
+              <svg style="margin-right: 8px; width: 16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                stroke-width="2">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                <line x1="3" y1="9" x2="21" y2="9"></line>
+                <line x1="9" y1="21" x2="9" y2="9"></line>
+              </svg>
+              Download Excel
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <section id="recommendations-section" class="content-section">
+        <header class="section-header">
+          <h2>AI Recommendations</h2>
+        </header>
+        <div class="panel">
+          <p style="margin-bottom: 1rem;">Based on your major and current progress, we suggest considering these
+            courses:</p>
+          <div id="recommendations-list" class="list"></div>
+        </div>
+      </section>
+    </main>
+
+    <div id="chatbot-widget" class="chatbot">
+      <div class="chatbot-header">Help</div>
+      <div id="chatbot-messages" class="chatbot-messages">
+        <div class="chatbot-message bot">Ask me about schedules, conflicts, or exports.</div>
+      </div>
+      <form id="chatbot-form" class="chatbot-input">
+        <input type="text" id="chatbot-input" placeholder="Type a question..." />
+        <button type="submit">Send</button>
+      </form>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+
+</html>

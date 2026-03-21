@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Student Registration - AI College Scheduler</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body class="auth-body">
+  <div class="auth-container">
+    <div class="auth-card">
+      <h1>Create Student Account</h1>
+      <form id="register-form">
+        <label>
+          Name
+          <input type="text" name="name" required />
+        </label>
+        <label>
+          Email
+          <input type="email" name="email" required />
+        </label>
+        <label>
+          Password
+          <input type="password" name="password" required />
+        </label>
+        <label>
+          Major (ID)
+          <input type="text" name="major_id" min="1" />
+        </label>
+        <label>
+          Year
+          <input type="number" name="year" min="1" max="8" />
+        </label>
+        <button type="submit">Register</button>
+        <p class="auth-switch">
+          Already have an account?
+          <a href="/login-page">Login</a>
+        </p>
+      </form>
+      <div id="register-error" class="error-text"></div>
+    </div>
+  </div>
+  <script src="script.js"></script>
+</body>
+</html>
+

@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <title>Admin Dashboard - AI College Scheduler</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="styles.css" />
+  <!-- Chart.js for statistics -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+
+<body class="dashboard-body">
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <h1>Admin</h1>
+        <p>AI College Scheduler</p>
+      </div>
+      <nav class="sidebar-nav">
+        <button class="nav-item active" data-section="upload-section">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="17 8 12 3 7 8" />
+            <line x1="12" y1="3" x2="12" y2="15" />
+          </svg>
+          Upload Files
+        </button>
+        <button class="nav-item" data-section="manage-courses-section">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+          </svg>
+          Manage Courses
+        </button>
+        <button class="nav-item" data-section="manage-users-section">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+            <circle cx="9" cy="7" r="4" />
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+            <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+          </svg>
+          Manage Users
+        </button>
+        <button class="nav-item" data-section="manage-sections-section">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+            <line x1="16" y1="2" x2="16" y2="6" />
+            <line x1="8" y1="2" x2="8" y2="6" />
+            <line x1="3" y1="10" x2="21" y2="10" />
+          </svg>
+          Schedules & Sections
+        </button>
+        <button class="nav-item" data-section="conflicts-section">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+            <line x1="12" y1="9" x2="12" y2="13" />
+            <line x1="12" y1="17" x2="12.01" y2="17" />
+          </svg>
+          System Conflicts
+        </button>
+      </nav>
+      <div class="sidebar-footer">
+        <button id="admin-logout-btn" class="secondary nav-item" style="width: 100%;">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+            <polyline points="16 17 21 12 16 7" />
+            <line x1="21" y1="12" x2="9" y2="12" />
+          </svg>
+          Logout
+        </button>
+      </div>
+    </aside>
+
+    <main class="main-content">
+      <!-- Stats Overview -->
+      <section class="stats-grid">
+        <div class="stat-card">
+          <h3>Students</h3>
+          <p id="stat-total-students">0</p>
+        </div>
+        <div class="stat-card">
+          <h3>Courses</h3>
+          <p id="stat-total-courses">0</p>
+        </div>
+        <div class="stat-card">
+          <h3>Sections</h3>
+          <p id="stat-total-sections">0</p>
+        </div>
+        <div class="stat-card">
+          <h3>Instructors</h3>
+          <p id="stat-total-instructors">0</p>
+        </div>
+        <div class="stat-card">
+          <h3>Classrooms</h3>
+          <p id="stat-total-classrooms">0</p>
+        </div>
+      </section>
+
+      <section id="upload-section" class="content-section active">
+        <header class="section-header">
+          <h2>Upload Course Schedules</h2>
+        </header>
+        <div class="panel">
+          <p style="margin-bottom: 1.5rem; color: var(--text-muted);">Deploy master schedules directly into the database
+            via CSV or Excel.</p>
+          <div class="upload-box" style="display: flex; gap: 1rem; align-items: flex-end;">
+            <div style="flex: 1;">
+              <input type="file" id="admin-course-file-input" accept=".csv, .xlsx" />
+            </div>
+            <button id="admin-upload-course-btn" class="primary">Upload and Process</button>
+          </div>
+          <div id="admin-upload-status" class="admin-upload-status"></div>
+        </div>
+      </section>
+
+      <section id="manage-courses-section" class="content-section">
+        <header class="section-header">
+          <h2>Courses Database</h2>
+          <button id="admin-add-course-btn" class="primary">+ Add New Course</button>
+        </header>
+        <div class="two-column">
+          <div class="panel" style="overflow-x: auto;">
+            <table id="admin-courses-table" class="data-table">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Code</th>
+                  <th>Name</th>
+                  <th>Credits</th>
+                  <th>Dept</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <div class="panel">
+            <h3 style="margin-bottom: 1.5rem;">Department Distribution</h3>
+            <canvas id="courses-by-dept-chart"></canvas>
+          </div>
+        </div>
+      </section>
+
+      <section id="manage-users-section" class="content-section">
+        <header class="section-header">
+          <h2>Student Management</h2>
+        </header>
+        <div class="panel" style="overflow-x: auto;">
+          <table id="admin-students-table" class="data-table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Major</th>
+                <th>Year</th>
+                <th>Active</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+
+        <header class="section-header" style="margin-top: 2rem;">
+          <h2>Instructor Directory</h2>
+        </header>
+        <div class="panel" style="overflow-x: auto;">
+          <table id="admin-instructors-table" class="data-table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Name</th>
+                <th>Department</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="manage-sections-section" class="content-section">
+        <header class="section-header">
+          <h2>Course Sections</h2>
+          <button id="admin-add-section-btn" class="primary">+ Add New Section</button>
+        </header>
+        <div class="panel" style="overflow-x: auto;">
+          <table id="admin-sections-table" class="data-table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Course</th>
+                <th>Instructor</th>
+                <th>Semester</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+
+        <header class="section-header" style="margin-top: 2rem;">
+          <h2>Classroom Utilization</h2>
+        </header>
+        <div class="panel" style="overflow-x: auto;">
+          <table id="admin-classrooms-table" class="data-table">
+            <thead>
+              <tr>
+                <th>Room ID</th>
+                <th>Building</th>
+                <th>Room #</th>
+                <th>Capacity</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+
+        <header class="section-header" style="margin-top: 2rem;">
+          <h2>Master Schedule Slots</h2>
+        </header>
+        <div class="panel" style="overflow-x: auto;">
+          <table id="admin-schedules-table" class="data-table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Section</th>
+                <th>Day</th>
+                <th>Start</th>
+                <th>End</th>
+                <th>Room</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="conflicts-section" class="content-section">
+        <header class="section-header">
+          <h2>System Conflict Detection</h2>
+          <button id="admin-run-conflicts-btn" class="secondary">Run Conflict Scan</button>
+        </header>
+        <div class="two-column">
+          <div class="panel">
+            <h3 style="margin-bottom: 1rem;">Room Double-Bookings</h3>
+            <ul id="admin-room-conflicts" class="conflict-list" style="list-style: none;"></ul>
+          </div>
+          <div class="panel">
+            <h3 style="margin-bottom: 1rem;">Instructor Scheduling Conflicts</h3>
+            <ul id="admin-instructor-conflicts" class="conflict-list" style="list-style: none;"></ul>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Modal Template for Add/Edit -->
+  <div id="admin-modal-overlay" class="modal-overlay hidden">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 id="admin-modal-title">Title</h2>
+        <button id="admin-modal-close" class="close-btn"
+          style="background: none; font-size: 1.5rem; color: var(--text-muted);">&times;</button>
+      </div>
+      <div id="admin-modal-body" class="modal-body">
+        <!-- Form injected here -->
+      </div>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+
+</html>
