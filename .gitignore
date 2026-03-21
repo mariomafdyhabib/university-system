@@ -173,8 +173,7 @@ cython_debug/
 ehthumbs.db
 Thumbs.db
 
-# Reports and other generated files
-reports/
+# Generated files
 *.xlsx
 *.docx
 *.pdf
