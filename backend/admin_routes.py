@@ -115,9 +115,34 @@ def create_section():
     new_sec = CourseSections(
         course_id=data.get('course_id'),
         instructor_id=data.get('instructor_id'),
-        semester=data.get('semester', 'TBD')
+        semester=data.get('semester', 'TBD'),
+        section_name=data.get('section_name', 'A')
     )
     db.session.add(new_sec)
+    db.session.flush()  # Get new_sec.section_id before commit
+
+    # Create schedule entry if timing provided
+    day = data.get('day_of_week')
+    start_raw = data.get('start_time')
+    end_raw = data.get('end_time')
+    classroom = data.get('classroom', '')
+
+    if day and start_raw and end_raw:
+        def fmt_time(t):
+            # Convert "08:00" -> "8:00 AM", "13:30" -> "1:30 PM"
+            hh, mm = map(int, t.split(':'))
+            ampm = 'AM' if hh < 12 else 'PM'
+            h12 = hh % 12 or 12
+            return f"{h12}:{mm:02d} {ampm}"
+        new_sch = Schedules(
+            section_id=new_sec.section_id,
+            day_of_week=day,
+            start_time=fmt_time(start_raw),
+            end_time=fmt_time(end_raw),
+            classroom=classroom
+        )
+        db.session.add(new_sch)
+
     db.session.commit()
     return jsonify({"message": "Section created", "section_id": new_sec.section_id})
 

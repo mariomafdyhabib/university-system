@@ -137,7 +137,8 @@ function wireStudentActions() {
       return apiRequest("/generate-schedule", {
         method: "POST",
         body: { course_sections: courseSections },
-      }).then(() => renderStudentSchedule()).then(() => console.log("Schedule generated."));
+      }).then(() => renderStudentSchedule()).then(() => console.log("Schedule generated."))
+        .catch((err) => alert("Could not generate schedule: " + err.message));
     }
     if (!courseIds || !courseIds.length) {
       alert("Select at least one course (Courses tab) or use Regenerate to re-run with current courses.");
@@ -146,7 +147,8 @@ function wireStudentActions() {
     return apiRequest("/generate-schedule", {
       method: "POST",
       body: { course_ids: courseIds },
-    }).then(() => renderStudentSchedule()).then(() => console.log("Schedule generated."));
+    }).then(() => renderStudentSchedule()).then(() => console.log("Schedule generated."))
+      .catch((err) => alert("Could not generate schedule: " + err.message));
   }
 
   function getSelectedForGenerate() {
@@ -750,6 +752,21 @@ function wireAdminActions() {
           <label>Course <select name="course_id" required>${courseOpts}</select></label>
           <label>Instructor <select name="instructor_id">${instOpts}</select></label>
           <label>Semester <input type="text" name="semester" value="TBD" /></label>
+          <label>Section Name <input type="text" name="section_name" value="A" /></label>
+          <label>Day
+            <select name="day_of_week" required>
+              <option value="Monday">Monday</option>
+              <option value="Tuesday">Tuesday</option>
+              <option value="Wednesday">Wednesday</option>
+              <option value="Thursday">Thursday</option>
+              <option value="Friday">Friday</option>
+              <option value="Saturday">Saturday</option>
+              <option value="Sunday">Sunday</option>
+            </select>
+          </label>
+          <label>Start Time <input type="time" name="start_time" required /></label>
+          <label>End Time <input type="time" name="end_time" required /></label>
+          <label>Classroom <input type="text" name="classroom" placeholder="e.g. Room 101" /></label>
           <div class="modal-actions">
             <button type="button" class="secondary" data-modal-cancel>Cancel</button>
             <button type="submit" class="primary">Create</button>
@@ -768,6 +785,11 @@ function wireAdminActions() {
               course_id: parseInt(fd.get("course_id"), 10),
               instructor_id: instVal ? parseInt(instVal, 10) : null,
               semester: fd.get("semester") || "TBD",
+              section_name: fd.get("section_name") || "A",
+              day_of_week: fd.get("day_of_week"),
+              start_time: fd.get("start_time"),
+              end_time: fd.get("end_time"),
+              classroom: fd.get("classroom") || "",
             },
           });
           adminCloseModal();
