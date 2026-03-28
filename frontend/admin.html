@@ -110,10 +110,10 @@
         <div class="panel">
           <p style="margin-bottom: 1.5rem; color: var(--text-muted);">Deploy master schedules directly into the database
             via CSV or Excel.</p>
-          <div class="upload-box" style="display: flex; gap: 1rem; align-items: flex-end;">
-            <div style="flex: 1;">
-              <input type="file" id="admin-course-file-input" accept=".csv, .xlsx" />
-            </div>
+          <div class="upload-box" style="display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
+            <input type="file" id="admin-course-file-input" accept=".csv,.xlsx" style="display:none;" />
+            <label for="admin-course-file-input" class="file-pick-btn">📂 Choose File (.csv / .xlsx)</label>
+            <span id="admin-file-name" style="color: var(--text-muted); font-size: 0.875rem; flex:1;">No file selected</span>
             <button id="admin-upload-course-btn" class="primary">Upload and Process</button>
           </div>
           <div id="admin-upload-status" class="admin-upload-status"></div>

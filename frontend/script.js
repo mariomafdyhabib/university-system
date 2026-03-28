@@ -611,7 +611,16 @@ function wireAdminCourseUpload() {
   const input = document.getElementById("admin-course-file-input");
   const btn = document.getElementById("admin-upload-course-btn");
   const status = document.getElementById("admin-upload-status");
+  const fileNameEl = document.getElementById("admin-file-name");
   if (!btn || !input || !status) return;
+
+  // Show selected filename
+  input.addEventListener("change", () => {
+    if (fileNameEl) {
+      fileNameEl.textContent = input.files && input.files[0] ? input.files[0].name : "No file selected";
+    }
+  });
+
   btn.addEventListener("click", async () => {
     const file = input.files && input.files[0];
     if (!file) {
@@ -639,6 +648,8 @@ function wireAdminCourseUpload() {
       if (data.rows_stored != null) status.textContent += ` (${data.rows_stored} rows stored.)`;
       status.className = "admin-upload-status success";
       input.value = "";
+      if (fileNameEl) fileNameEl.textContent = "No file selected";
+
     } catch (err) {
       status.textContent = err.message || "Upload failed.";
       status.className = "admin-upload-status error";
