@@ -14,8 +14,9 @@
   <div class="layout">
     <aside class="sidebar">
       <div class="sidebar-header">
-        <h1>Admin</h1>
-        <p>AI College Scheduler</p>
+        <img src="assets/logo.png" alt="IUK Logo" class="sidebar-logo">
+        <h1>IUK Admin</h1>
+        <p>College Scheduler</p>
       </div>
       <nav class="sidebar-nav">
         <button class="nav-item active" data-section="upload-section">
@@ -105,20 +106,46 @@
 
       <section id="upload-section" class="content-section active">
         <header class="section-header">
-          <h2>Upload Course Schedules</h2>
+          <h2>Import Schedule from Excel</h2>
         </header>
         <div class="panel">
-          <p style="margin-bottom: 1.5rem; color: var(--text-muted);">Deploy master schedules directly into the database
-            via CSV or Excel.</p>
+          <p style="margin-bottom: 0.5rem; color: var(--text-muted);">
+            Upload a <strong>Schedule Report</strong> Excel file (.xlsx) to populate courses, sections, and schedules.
+          </p>
+          <p style="margin-bottom: 1.5rem; color: var(--text-muted); font-size: 0.85rem;">
+            Expected columns: <code>Course</code> · <code>Course Section</code> · <code>Room</code> ·
+            <code>Day Name</code> · <code>Time</code>
+          </p>
+
           <div class="upload-box" style="display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
             <input type="file" id="admin-course-file-input" accept=".csv,.xlsx" style="display:none;" />
             <label for="admin-course-file-input" class="file-pick-btn">📂 Choose File (.csv / .xlsx)</label>
-            <span id="admin-file-name" style="color: var(--text-muted); font-size: 0.875rem; flex:1;">No file selected</span>
-            <button id="admin-upload-course-btn" class="primary">Upload and Process</button>
+            <span id="admin-file-name" style="color: var(--text-muted); font-size: 0.875rem; flex:1;">No file
+              selected</span>
           </div>
-          <div id="admin-upload-status" class="admin-upload-status"></div>
+
+          <!-- Import Mode -->
+          <div style="margin-top: 1.25rem; display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;">
+            <label style="font-weight: 600; font-size: 0.9rem;">Import mode:</label>
+            <label style="display:flex; align-items:center; gap:0.4rem; cursor:pointer;">
+              <input type="radio" name="upload-mode" value="append" checked /> Append (keep existing data)
+            </label>
+            <label style="display:flex; align-items:center; gap:0.4rem; cursor:pointer;">
+              <input type="radio" name="upload-mode" value="replace" />
+              <span style="color:#e74c3c; font-weight:600;">Replace All</span>
+              <span style="font-size:0.78rem; color:var(--text-muted);">(wipes courses, sections &amp; schedules
+                first)</span>
+            </label>
+          </div>
+
+          <div style="margin-top: 1.25rem;">
+            <button id="admin-upload-course-btn" class="primary">⬆ Upload and Import</button>
+          </div>
+
+          <div id="admin-upload-status" class="admin-upload-status" style="margin-top:1rem;"></div>
         </div>
       </section>
+
 
       <section id="manage-courses-section" class="content-section">
         <header class="section-header">

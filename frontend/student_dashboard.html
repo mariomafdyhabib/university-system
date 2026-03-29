@@ -12,15 +12,9 @@
   <div class="layout">
     <aside class="sidebar">
       <div class="sidebar-header">
-        <div class="logo-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
-          </svg>
-        </div>
-        <div>
-          <h1>Student</h1>
-          <p>AI College Scheduler</p>
-        </div>
+        <img src="assets/logo.png" alt="IUK Logo" class="sidebar-logo">
+        <h1>IUK Student</h1>
+        <p>College Scheduler</p>
       </div>
       <nav class="sidebar-nav">
         <button class="nav-item active" data-section="courses-section">
@@ -46,14 +40,6 @@
             <line x1="12" y1="15" x2="12" y2="3"></line>
           </svg>
           Exports
-        </button>
-        <button class="nav-item" data-section="recommendations-section">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polygon
-              points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2">
-            </polygon>
-          </svg>
-          Recommendations
         </button>
       </nav>
       <div class="sidebar-footer">
@@ -144,32 +130,24 @@
           </div>
         </div>
       </section>
-
-      <section id="recommendations-section" class="content-section">
-        <header class="section-header">
-          <h2>AI Recommendations</h2>
-        </header>
-        <div class="panel">
-          <p style="margin-bottom: 1rem;">Based on your major and current progress, we suggest considering these
-            courses:</p>
-          <div id="recommendations-list" class="list"></div>
-        </div>
       </section>
     </main>
 
-    <div id="chatbot-widget" class="chatbot">
-      <div class="chatbot-header">Help</div>
-      <div id="chatbot-messages" class="chatbot-messages">
-        <div class="chatbot-message bot">Ask me about schedules, conflicts, or exports.</div>
+    <!-- Student Modal for Quick Info / Details -->
+    <div id="student-modal-overlay" class="modal-overlay hidden">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2 id="student-modal-title">Course Details</h2>
+          <button id="student-modal-close" class="close-btn"
+            style="background: none; font-size: 1.5rem; color: var(--text-muted); border: none; cursor: pointer;">&times;</button>
+        </div>
+        <div id="student-modal-body" class="modal-body">
+          <!-- Details injected here -->
+        </div>
       </div>
-      <form id="chatbot-form" class="chatbot-input">
-        <input type="text" id="chatbot-input" placeholder="Type a question..." />
-        <button type="submit">Send</button>
-      </form>
     </div>
-  </div>
 
-  <script src="script.js"></script>
+    <script src="script.js"></script>
 </body>
 
 </html>

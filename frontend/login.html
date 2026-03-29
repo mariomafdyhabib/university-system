@@ -1,28 +1,32 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
   <title>Student Login - AI College Scheduler</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="stylesheet" href="styles.css" />
 </head>
+
 <body class="auth-body">
   <div class="auth-container">
     <div class="auth-card">
+      <img src="assets/logo.png" alt="IUK Logo" class="auth-logo">
       <h1>Student Login</h1>
+      <p class="subtitle">International University - Kuwait</p>
       <form id="login-form">
-        <label>
-          Email
-          <input type="email" name="email" required />
-        </label>
-        <label>
-          Password
-          <input type="password" name="password" required />
-        </label>
-        <button type="submit">Login</button>
+        <div class="form-group">
+          <label for="login-email">Email Address</label>
+          <input type="email" id="login-email" name="email" placeholder="name@example.com" required />
+        </div>
+        <div class="form-group">
+          <label for="login-password">Password</label>
+          <input type="password" id="login-password" name="password" placeholder="••••••••" required />
+        </div>
+        <button type="submit" class="primary">Sign In</button>
         <p class="auth-switch">
-          New here?
-          <a href="/register-page">Create an account</a>
+          Don't have an account?
+          <a href="/register-page">Create one now</a>
         </p>
       </form>
       <div id="login-error" class="error-text"></div>
@@ -30,5 +34,5 @@
   </div>
   <script src="script.js"></script>
 </body>
-</html>
 
+</html>

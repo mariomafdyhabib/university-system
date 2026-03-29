@@ -208,15 +208,24 @@ def upload_course_file():
     file = request.files['file']
     if file.filename == '':
         return jsonify({"error": "No selected file"}), 400
-    
+
+    mode = request.form.get('mode', 'append')   # 'append' or 'replace'
+
     # Save file temporarily
     temp_path = os.path.join("/tmp", file.filename)
     file.save(temp_path)
-    
+
     try:
-        rows_added = process_upload(temp_path)
-        return jsonify({"message": "Upload successful", "rows_stored": rows_added})
+        rows_added = process_upload(temp_path, mode=mode)
+        return jsonify({
+            "message": "Upload successful",
+            "rows_processed": rows_added,
+            "courses": Courses.query.count(),
+            "sections": CourseSections.query.count(),
+            "schedules": Schedules.query.count(),
+        })
     except Exception as e:
+        db.session.rollback()
         return jsonify({"error": str(e)}), 500
     finally:
         if os.path.exists(temp_path):

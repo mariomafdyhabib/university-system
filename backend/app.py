@@ -12,7 +12,11 @@ from database import db, Students, Admins, Courses, Enrollments, CourseSections,
 import scheduler
 import course_upload
 from admin_routes import admin_bp
-# import chatbot
+
+import io
+import pandas as pd
+from fpdf import FPDF
+from flask import send_file
 
 # Calculate absolute paths for robustness
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
@@ -29,6 +33,16 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db.init_app(app)
 app.register_blueprint(admin_bp)
+
+@app.after_request
+def no_cache(response):
+    """Prevent browser from caching HTML/JS/CSS during development."""
+    if response.content_type.startswith(('text/html', 'application/javascript', 'text/css')):
+        response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
+    return response
+
 
 login_manager = LoginManager()
 login_manager.init_app(app)
@@ -244,9 +258,96 @@ def clear_schedule():
     db.session.commit()
     return jsonify({"message": "Schedule cleared"})
 
-@app.route('/chatbot', methods=['POST'])
-def chatbot_msg():
-    return jsonify({"answer": "I'm a simple helper bot"})
+@app.route('/schedule/export/pdf', methods=['GET'])
+@login_required
+def export_pdf():
+    try:
+        enrolls = Enrollments.query.filter_by(student_id=current_user.student_id).all()
+        unique_section_ids = {enr.section_id for enr in enrolls}
+        data = []
+        for sec_id in unique_section_ids:
+            sec = CourseSections.query.get(sec_id)
+            if not sec: continue
+            crs = Courses.query.get(sec.course_id)
+            schs = Schedules.query.filter_by(section_id=sec.section_id).all()
+            for s in schs:
+                data.append({
+                    "Course": f"{crs.course_code} - {crs.course_name}",
+                    "Day": s.day_of_week,
+                    "Time": f"{s.start_time} - {s.end_time}",
+                    "Room": s.classroom
+                })
+        
+        pdf = FPDF()
+        pdf.add_page()
+        pdf.set_font("Arial", 'B', 16)
+        pdf.cell(0, 10, "International University of Kuwait (IUK)", ln=True, align='C')
+        pdf.set_font("Arial", 'B', 14)
+        pdf.cell(0, 10, "Student Weekly Schedule", ln=True, align='C')
+        pdf.ln(10)
+        
+        pdf.set_font("Arial", 'B', 12)
+        pdf.cell(80, 10, "Course", border=1)
+        pdf.cell(30, 10, "Day", border=1)
+        pdf.cell(50, 10, "Time", border=1)
+        pdf.cell(30, 10, "Room", border=1)
+        pdf.ln()
+        
+        pdf.set_font("Arial", '', 10)
+        for item in data:
+            pdf.cell(80, 10, item["Course"], border=1)
+            pdf.cell(30, 10, item["Day"], border=1)
+            pdf.cell(50, 10, item["Time"], border=1)
+            pdf.cell(30, 10, item["Room"], border=1)
+            pdf.ln()
+            
+        output = io.BytesIO()
+        pdf_content = pdf.output(dest='S').encode('latin-1')
+        output.write(pdf_content)
+        output.seek(0)
+        
+        return send_file(output, as_attachment=True, download_name="schedule.pdf", mimetype="application/pdf")
+    except Exception as e:
+        return jsonify({"error": f"PDF Export Failed: {str(e)}"}), 500
+
+@app.route('/schedule/export/excel', methods=['GET'])
+@login_required
+def export_excel():
+    try:
+        enrolls = Enrollments.query.filter_by(student_id=current_user.student_id).all()
+        unique_section_ids = {enr.section_id for enr in enrolls}
+        data = []
+        for sec_id in unique_section_ids:
+            sec = CourseSections.query.get(sec_id)
+            if not sec: continue
+            crs = Courses.query.get(sec.course_id)
+            schs = Schedules.query.filter_by(section_id=sec.section_id).all()
+            for s in schs:
+                data.append({
+                    "Course Code": crs.course_code,
+                    "Course Name": crs.course_name,
+                    "Day": s.day_of_week,
+                    "Start Time": s.start_time,
+                    "End Time": s.end_time,
+                    "Classroom": s.classroom
+                })
+        
+        if not data:
+            return jsonify({"error": "No schedule records found to export"}), 400
+
+        df = pd.DataFrame(data)
+        output = io.BytesIO()
+        # Use a more explicit writer close pattern for broader compatibility
+        writer = pd.ExcelWriter(output, engine='openpyxl')
+        df.to_excel(writer, index=False, sheet_name='My Schedule')
+        writer.close()
+        output.seek(0)
+        
+        return send_file(output, as_attachment=True, download_name="schedule.xlsx", mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": f"Excel Export Failed: {str(e)}"}), 500
 
 # HTML Pages Routes
 @app.route('/')

@@ -85,6 +85,7 @@ function initStudentDashboard() {
   wireSidebarNavigation();
   wireStudentActions();
   wireDashboardGoSchedule();
+  wireStudentModal();
   renderStudentCourses();
   renderStudentSchedule();
 }
@@ -132,23 +133,27 @@ function wireStudentActions() {
     });
   }
 
-  function doGenerate(courseIds, courseSections) {
-    if (courseSections && courseSections.length > 0) {
-      return apiRequest("/generate-schedule", {
+  async function doGenerate(courseIds, courseSections) {
+    try {
+      if (courseSections && courseSections.length > 0) {
+        await apiRequest("/generate-schedule", {
+          method: "POST",
+          body: { course_sections: courseSections },
+        });
+        await renderStudentSchedule();
+        return;
+      }
+      if (!courseIds || !courseIds.length) {
+        throw new Error("Select at least one course from the 'Available Courses' list.");
+      }
+      await apiRequest("/generate-schedule", {
         method: "POST",
-        body: { course_sections: courseSections },
-      }).then(() => renderStudentSchedule()).then(() => console.log("Schedule generated."))
-        .catch((err) => alert("Could not generate schedule: " + err.message));
+        body: { course_ids: courseIds },
+      });
+      await renderStudentSchedule();
+    } catch (err) {
+      throw err;
     }
-    if (!courseIds || !courseIds.length) {
-      alert("Select at least one course (Courses tab) or use Regenerate to re-run with current courses.");
-      return;
-    }
-    return apiRequest("/generate-schedule", {
-      method: "POST",
-      body: { course_ids: courseIds },
-    }).then(() => renderStudentSchedule()).then(() => console.log("Schedule generated."))
-      .catch((err) => alert("Could not generate schedule: " + err.message));
   }
 
   function getSelectedForGenerate() {
@@ -171,7 +176,7 @@ function wireStudentActions() {
         const schedTabBtn = document.querySelector('[data-section="schedule-section"]');
         if (schedTabBtn) schedTabBtn.click();
       } catch (err) {
-        alert("Scheduling Error: " + err.message);
+        showConflictModal(err.message);
       } finally {
         generateBtn.disabled = false;
         generateBtn.textContent = "Generate Schedule";
@@ -193,7 +198,7 @@ function wireStudentActions() {
         const schedTabBtn = document.querySelector('[data-section="schedule-section"]');
         if (schedTabBtn) schedTabBtn.click();
       } catch (err) {
-        alert(err.message);
+        showConflictModal(err.message);
       }
     });
   }
@@ -222,7 +227,7 @@ function wireStudentActions() {
         await renderStudentSchedule();
         alert("Schedule regenerated.");
       } catch (err) {
-        alert(err.message);
+        showConflictModal(err.message);
       }
     });
   }
@@ -231,6 +236,12 @@ function wireStudentActions() {
   if (exportPdfBtn) {
     exportPdfBtn.addEventListener("click", () => {
       window.location.href = "/schedule/export/pdf";
+    });
+  }
+  const exportExcelBtn = document.getElementById("export-excel-btn");
+  if (exportExcelBtn) {
+    exportExcelBtn.addEventListener("click", () => {
+      window.location.href = "/schedule/export/excel";
     });
   }
   const refreshBtn = document.getElementById("refresh-schedule-btn");
@@ -518,10 +529,99 @@ function renderTimetableGrid(container, entries) {
       </div>
     `;
 
+      block.addEventListener("click", () => {
+        showEventDetail(entry);
+      });
+
       attachEventActions(block);
       dayCol.appendChild(block);
     });
   });
+}
+
+function showEventDetail(entry) {
+  const bodyHtml = `
+    <div class="event-detail-card">
+      <div class="modal-detail-row">
+        <span class="modal-detail-label">Course Code</span>
+        <span class="modal-detail-value">${escapeHtml(entry.course_code)}</span>
+      </div>
+      <div class="modal-detail-row">
+        <span class="modal-detail-label">Course Name</span>
+        <span class="modal-detail-value">${escapeHtml(entry.course_name)}</span>
+      </div>
+      <div class="modal-detail-row">
+        <span class="modal-detail-label">Instructor</span>
+        <span class="modal-detail-value">${escapeHtml(entry.instructor || "TBD")}</span>
+      </div>
+      <div class="modal-detail-row">
+        <span class="modal-detail-label">Location</span>
+        <span class="modal-detail-value">${escapeHtml(entry.classroom || "TBD")}</span>
+      </div>
+      <div class="modal-detail-row">
+        <span class="modal-detail-label">Day</span>
+        <span class="modal-detail-value">${escapeHtml(entry.day_of_week)}</span>
+      </div>
+      <div class="modal-detail-row">
+        <span class="modal-detail-label">Time</span>
+        <span class="modal-detail-value">${entry.start_time} – ${entry.end_time}</span>
+      </div>
+      ${entry.section_name ? `
+      <div class="modal-detail-row">
+        <span class="modal-detail-label">Section</span>
+        <span class="modal-detail-value">${escapeHtml(entry.section_name)}</span>
+      </div>` : ""}
+    </div>
+  `;
+  studentShowModal(entry.course_name, bodyHtml);
+}
+
+function studentShowModal(title, bodyHtml) {
+  const overlay = document.getElementById("student-modal-overlay");
+  const titleEl = document.getElementById("student-modal-title");
+  const bodyEl = document.getElementById("student-modal-body");
+  if (overlay && titleEl && bodyEl) {
+    titleEl.textContent = title;
+    bodyEl.innerHTML = bodyHtml;
+    overlay.classList.remove("hidden");
+  }
+}
+
+function studentCloseModal() {
+  const overlay = document.getElementById("student-modal-overlay");
+  if (overlay) overlay.classList.add("hidden");
+}
+
+function showConflictModal(message) {
+  const bodyHtml = `
+    <div style="text-align: center; padding: 1rem;">
+      <div style="color: var(--error); font-size: 3rem; margin-bottom: 1rem;">⚠️</div>
+      <p style="margin-bottom: 1.5rem; line-height: 1.6;">${escapeHtml(message)}</p>
+      <div style="background: rgba(255,255,255,0.05); padding: 1rem; border-radius: 12px; font-size: 0.9rem; color: var(--text-muted); text-align: left;">
+        <strong>How to Resolve:</strong>
+        <ul style="margin-top: 0.5rem; padding-left: 1.2rem;">
+          <li>Remove one of the conflicting courses from your selection.</li>
+          <li>Choose a different section for one of the courses.</li>
+          <li>Try generating a schedule with a different combination of courses.</li>
+        </ul>
+      </div>
+      <button class="primary" style="margin-top: 2rem; width: 100%;" onclick="studentCloseModal()">Understood</button>
+    </div>
+  `;
+  studentShowModal("Scheduling Conflict", bodyHtml);
+}
+
+function wireStudentModal() {
+  const closeBtn = document.getElementById("student-modal-close");
+  if (closeBtn) {
+    closeBtn.addEventListener("click", studentCloseModal);
+  }
+  const overlay = document.getElementById("student-modal-overlay");
+  if (overlay) {
+    overlay.addEventListener("click", (e) => {
+      if (e.target === overlay) studentCloseModal();
+    });
+  }
 }
 
 function attachEventActions(block) {
@@ -541,34 +641,6 @@ function attachEventActions(block) {
       }
     });
   }
-}
-function initChatbotWidget() {
-  const form = document.getElementById("chatbot-form");
-  const input = document.getElementById("chatbot-input");
-  const messages = document.getElementById("chatbot-messages");
-  if (!form || !input || !messages) return;
-  form.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const text = input.value.trim();
-    if (!text) return;
-    appendChatbotMessage("user", text);
-    input.value = "";
-    try {
-      const res = await apiRequest("/chatbot", { method: "POST", body: { message: text } });
-      appendChatbotMessage("bot", res.answer || "");
-    } catch (err) {
-      appendChatbotMessage("bot", err.message);
-    }
-  });
-}
-function appendChatbotMessage(role, text) {
-  const messages = document.getElementById("chatbot-messages");
-  if (!messages) return;
-  const div = document.createElement("div");
-  div.className = `chatbot-message ${role}`;
-  div.textContent = text;
-  messages.appendChild(div);
-  messages.scrollTop = messages.scrollHeight;
 }
 // Admin side
 function initAdminDashboard() {
@@ -624,38 +696,65 @@ function wireAdminCourseUpload() {
   btn.addEventListener("click", async () => {
     const file = input.files && input.files[0];
     if (!file) {
-      status.textContent = "Please select a file.";
+      status.innerHTML = "⚠️ Please select a file first.";
       status.className = "admin-upload-status error";
       return;
     }
-    status.textContent = "Uploading...";
+
+    // Read selected mode
+    const modeEl = document.querySelector('input[name="upload-mode"]:checked');
+    const mode = modeEl ? modeEl.value : "append";
+
+    if (mode === "replace" && !confirm("⚠️ Replace All will wipe ALL existing courses, sections and schedules before importing. Continue?")) {
+      return;
+    }
+
+    btn.disabled = true;
+    status.innerHTML = "⏳ Uploading and importing — please wait…";
     status.className = "admin-upload-status";
+
     try {
       const formData = new FormData();
       formData.append("file", file);
+      formData.append("mode", mode);
+
       const res = await fetch("/admin/upload-course-file", {
         method: "POST",
         credentials: "include",
         body: formData,
       });
       const data = await res.json().catch(() => ({}));
+
       if (!res.ok) {
-        status.textContent = data.error || `Upload failed (${res.status})`;
+        status.innerHTML = `❌ ${data.error || `Upload failed (${res.status})`}`;
         status.className = "admin-upload-status error";
         return;
       }
-      status.textContent = data.message || "Upload successful; student view rebuilt.";
-      if (data.rows_stored != null) status.textContent += ` (${data.rows_stored} rows stored.)`;
+
+      status.innerHTML = `
+        ✅ <strong>Import successful!</strong><br>
+        Rows processed: <strong>${data.rows_processed ?? "—"}</strong> &nbsp;|&nbsp;
+        Courses: <strong>${data.courses ?? "—"}</strong> &nbsp;|&nbsp;
+        Sections: <strong>${data.sections ?? "—"}</strong> &nbsp;|&nbsp;
+        Schedules: <strong>${data.schedules ?? "—"}</strong>
+      `;
       status.className = "admin-upload-status success";
+
       input.value = "";
       if (fileNameEl) fileNameEl.textContent = "No file selected";
 
+      // Refresh stats & tables
+      loadAdminStatsAndTables();
+
     } catch (err) {
-      status.textContent = err.message || "Upload failed.";
+      status.innerHTML = `❌ ${err.message || "Upload failed."}`;
       status.className = "admin-upload-status error";
+    } finally {
+      btn.disabled = false;
     }
   });
 }
+
 
 function wireAdminActions() {
   const logoutBtn = document.getElementById("admin-logout-btn");
@@ -709,13 +808,25 @@ function wireAdminActions() {
     addCourseBtn.addEventListener("click", () => {
       const body = `
         <form id="admin-course-form">
-          <label>Code <input type="text" name="course_code" required /></label>
-          <label>Name <input type="text" name="course_name" required /></label>
-          <label>Credits <input type="number" name="credits" value="3" min="1" /></label>
-          <label>Department <input type="text" name="department" value="General" /></label>
-          <div class="modal-actions">
-            <button type="button" class="secondary" data-modal-cancel>Cancel</button>
-            <button type="submit" class="primary">Create</button>
+          <div class="form-group">
+            <label for="course-code">Code</label>
+            <input type="text" id="course-code" name="course_code" placeholder="e.g. CS101" required />
+          </div>
+          <div class="form-group">
+            <label for="course-name">Name</label>
+            <input type="text" id="course-name" name="course_name" placeholder="e.g. Intro to Computer Science" required />
+          </div>
+          <div class="form-group">
+            <label for="course-credits">Credits</label>
+            <input type="number" id="course-credits" name="credits" value="3" min="1" />
+          </div>
+          <div class="form-group">
+            <label for="course-dept">Department</label>
+            <input type="text" id="course-dept" name="department" value="General" />
+          </div>
+          <div class="modal-actions" style="display: flex; gap: 1rem; margin-top: 2rem;">
+            <button type="button" class="secondary" data-modal-cancel style="flex: 1;">Cancel</button>
+            <button type="submit" class="primary" style="flex: 1;">Create Course</button>
           </div>
         </form>`;
       adminShowModal("Add Course", body);
@@ -760,12 +871,25 @@ function wireAdminActions() {
       const instOpts = "<option value=''>— No instructor —</option>" + instructors.map((i) => `<option value="${i.instructor_id}">${i.name}</option>`).join("");
       const body = `
         <form id="admin-section-form">
-          <label>Course <select name="course_id" required>${courseOpts}</select></label>
-          <label>Instructor <select name="instructor_id">${instOpts}</select></label>
-          <label>Semester <input type="text" name="semester" value="TBD" /></label>
-          <label>Section Name <input type="text" name="section_name" value="A" /></label>
-          <label>Day
-            <select name="day_of_week" required>
+          <div class="form-group">
+            <label for="sec-course">Course</label>
+            <select id="sec-course" name="course_id" required>${courseOpts}</select>
+          </div>
+          <div class="form-group">
+            <label for="sec-inst">Instructor</label>
+            <select id="sec-inst" name="instructor_id">${instOpts}</select>
+          </div>
+          <div class="form-group">
+            <label for="sec-sem">Semester</label>
+            <input type="text" id="sec-sem" name="semester" value="Spring 2026" />
+          </div>
+          <div class="form-group">
+            <label for="sec-name">Section Name</label>
+            <input type="text" id="sec-name" name="section_name" value="A" />
+          </div>
+          <div class="form-group">
+            <label for="sec-day">Day of Week</label>
+            <select id="sec-day" name="day_of_week" required>
               <option value="Monday">Monday</option>
               <option value="Tuesday">Tuesday</option>
               <option value="Wednesday">Wednesday</option>
@@ -774,13 +898,24 @@ function wireAdminActions() {
               <option value="Saturday">Saturday</option>
               <option value="Sunday">Sunday</option>
             </select>
-          </label>
-          <label>Start Time <input type="time" name="start_time" required /></label>
-          <label>End Time <input type="time" name="end_time" required /></label>
-          <label>Classroom <input type="text" name="classroom" placeholder="e.g. Room 101" /></label>
-          <div class="modal-actions">
-            <button type="button" class="secondary" data-modal-cancel>Cancel</button>
-            <button type="submit" class="primary">Create</button>
+          </div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+            <div class="form-group">
+              <label for="sec-start">Start Time</label>
+              <input type="time" id="sec-start" name="start_time" required />
+            </div>
+            <div class="form-group">
+              <label for="sec-end">End Time</label>
+              <input type="time" id="sec-end" name="end_time" required />
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="sec-room">Classroom</label>
+            <input type="text" id="sec-room" name="classroom" placeholder="e.g. Room 101" />
+          </div>
+          <div class="modal-actions" style="display: flex; gap: 1rem; margin-top: 2rem;">
+            <button type="button" class="secondary" data-modal-cancel style="flex: 1;">Cancel</button>
+            <button type="submit" class="primary" style="flex: 1;">Create Section</button>
           </div>
         </form>`;
       adminShowModal("Add Section", body);
@@ -812,6 +947,7 @@ function wireAdminActions() {
     });
   }
 }
+
 function escapeHtmlAdmin(str) {
   if (str == null) return "";
   const s = String(str);
@@ -836,13 +972,27 @@ function wireAdminTableActions() {
       const body = `
         <form id="admin-edit-student-form">
           <input type="hidden" name="student_id" value="${escapeHtmlAdmin(studentId)}" />
-          <label>Name <input type="text" name="name" value="${escapeHtmlAdmin(name)}" required /></label>
-          <label>Email <input type="email" name="email" value="${escapeHtmlAdmin(email)}" required /></label>
-          <label>Major ID <input type="text" name="major_id" value="${escapeHtmlAdmin(majorId)}" /></label>
-          <label>Year <input type="text" name="year" value="${escapeHtmlAdmin(year)}" /></label>
-          <div class="modal-actions">
-            <button type="button" class="secondary" data-modal-cancel>Cancel</button>
-            <button type="submit" class="primary">Save</button>
+          <div class="form-group">
+            <label for="edit-st-name">Name</label>
+            <input type="text" id="edit-st-name" name="name" value="${escapeHtmlAdmin(name)}" required />
+          </div>
+          <div class="form-group">
+            <label for="edit-st-email">Email</label>
+            <input type="email" id="edit-st-email" name="email" value="${escapeHtmlAdmin(email)}" required />
+          </div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+            <div class="form-group">
+              <label for="edit-st-major">Major ID</label>
+              <input type="text" id="edit-st-major" name="major_id" value="${escapeHtmlAdmin(majorId)}" />
+            </div>
+            <div class="form-group">
+              <label for="edit-st-year">Year</label>
+              <input type="text" id="edit-st-year" name="year" value="${escapeHtmlAdmin(year)}" />
+            </div>
+          </div>
+          <div class="modal-actions" style="display: flex; gap: 1rem; margin-top: 2rem;">
+            <button type="button" class="secondary" data-modal-cancel style="flex: 1;">Cancel</button>
+            <button type="submit" class="primary" style="flex: 1;">Save Changes</button>
           </div>
         </form>`;
       adminShowModal("Edit Student", body);
@@ -884,10 +1034,13 @@ function wireAdminTableActions() {
       const body = `
         <form id="admin-reset-password-form">
           <input type="hidden" name="student_id" value="${escapeHtmlAdmin(studentId)}" />
-          <label>New password <input type="password" name="new_password" required /></label>
-          <div class="modal-actions">
-            <button type="button" class="secondary" data-modal-cancel>Cancel</button>
-            <button type="submit" class="primary">Reset</button>
+          <div class="form-group">
+            <label for="reset-pw">New Password</label>
+            <input type="password" id="reset-pw" name="new_password" placeholder="••••••••" required />
+          </div>
+          <div class="modal-actions" style="display: flex; gap: 1rem; margin-top: 2rem;">
+            <button type="button" class="secondary" data-modal-cancel style="flex: 1;">Cancel</button>
+            <button type="submit" class="primary" style="flex: 1;">Reset Password</button>
           </div>
         </form>`;
       adminShowModal("Reset Password", body);
@@ -918,13 +1071,25 @@ function wireAdminTableActions() {
       const body = `
         <form id="admin-edit-course-form">
           <input type="hidden" name="course_id" value="${escapeHtmlAdmin(cid)}" />
-          <label>Code <input type="text" name="course_code" value="${escapeHtmlAdmin(code)}" required /></label>
-          <label>Name <input type="text" name="course_name" value="${escapeHtmlAdmin(name)}" required /></label>
-          <label>Credits <input type="number" name="credits" value="${escapeHtmlAdmin(credits)}" min="1" /></label>
-          <label>Department <input type="text" name="department" value="${escapeHtmlAdmin(dept)}" /></label>
-          <div class="modal-actions">
-            <button type="button" class="secondary" data-modal-cancel>Cancel</button>
-            <button type="submit" class="primary">Save</button>
+          <div class="form-group">
+            <label for="edit-c-code">Code</label>
+            <input type="text" id="edit-c-code" name="course_code" value="${escapeHtmlAdmin(code)}" required />
+          </div>
+          <div class="form-group">
+            <label for="edit-c-name">Name</label>
+            <input type="text" id="edit-c-name" name="course_name" value="${escapeHtmlAdmin(name)}" required />
+          </div>
+          <div class="form-group">
+            <label for="edit-c-credits">Credits</label>
+            <input type="number" id="edit-c-credits" name="credits" value="${escapeHtmlAdmin(credits)}" min="1" />
+          </div>
+          <div class="form-group">
+            <label for="edit-c-dept">Department</label>
+            <input type="text" id="edit-c-dept" name="department" value="${escapeHtmlAdmin(dept)}" />
+          </div>
+          <div class="modal-actions" style="display: flex; gap: 1rem; margin-top: 2rem;">
+            <button type="button" class="secondary" data-modal-cancel style="flex: 1;">Cancel</button>
+            <button type="submit" class="primary" style="flex: 1;">Save Changes</button>
           </div>
         </form>`;
       adminShowModal("Edit Course", body);
@@ -978,12 +1143,21 @@ function wireAdminTableActions() {
       const body = `
         <form id="admin-edit-section-form">
           <input type="hidden" name="section_id" value="${escapeHtmlAdmin(sectionId)}" />
-          <label>Course <select name="course_id" required>${courseOpts}</select></label>
-          <label>Instructor <select name="instructor_id">${instOpts}</select></label>
-          <label>Semester <input type="text" name="semester" value="${escapeHtmlAdmin(semester)}" /></label>
-          <div class="modal-actions">
-            <button type="button" class="secondary" data-modal-cancel>Cancel</button>
-            <button type="submit" class="primary">Save</button>
+          <div class="form-group">
+            <label for="edit-sec-course">Course</label>
+            <select id="edit-sec-course" name="course_id" required>${courseOpts}</select>
+          </div>
+          <div class="form-group">
+            <label for="edit-sec-inst">Instructor</label>
+            <select id="edit-sec-inst" name="instructor_id">${instOpts}</select>
+          </div>
+          <div class="form-group">
+            <label for="edit-sec-sem">Semester</label>
+            <input type="text" id="edit-sec-sem" name="semester" value="${escapeHtmlAdmin(semester)}" />
+          </div>
+          <div class="modal-actions" style="display: flex; gap: 1rem; margin-top: 2rem;">
+            <button type="button" class="secondary" data-modal-cancel style="flex: 1;">Cancel</button>
+            <button type="submit" class="primary" style="flex: 1;">Save Changes</button>
           </div>
         </form>`;
       adminShowModal("Edit Section", body);
