@@ -143,26 +143,29 @@ def _process_schedule_report(df, mode):
             course_cache[code] = c
         course = course_cache[code]
 
-        # ── Section ───────────────────────────────────────────────────────
-        sec_key = (code, sec_label)
-        if sec_key not in section_cache:
-            sec = CourseSections.query.filter_by(
-                course_id=course.course_id, section_name=sec_label
-            ).first()
-            if not sec:
-                sec = CourseSections(
-                    course_id=course.course_id,
-                    instructor_id=None,
-                    section_name=sec_label,
-                    semester='Spring 2026'
-                )
-                db.session.add(sec)
-                db.session.flush()
-            section_cache[sec_key] = sec
-        sec = section_cache[sec_key]
-
         # ── Schedule rows (one per day) ───────────────────────────────────
         for day in days:
+            day_short = day[:3] if len(day) >= 3 else day
+            sec_label_day = f"{sec_label} ({day_short})"
+            sec_key = (code, sec_label_day)
+            
+            # ── Section per Day ───────────────────────────────────────────
+            if sec_key not in section_cache:
+                sec = CourseSections.query.filter_by(
+                    course_id=course.course_id, section_name=sec_label_day
+                ).first()
+                if not sec:
+                    sec = CourseSections(
+                        course_id=course.course_id,
+                        instructor_id=None,
+                        section_name=sec_label_day,
+                        semester='Spring 2026'
+                    )
+                    db.session.add(sec)
+                    db.session.flush()
+                section_cache[sec_key] = sec
+            sec = section_cache[sec_key]
+
             exists = Schedules.query.filter_by(
                 section_id=sec.section_id, day_of_week=day
             ).first()
@@ -235,16 +238,18 @@ def _process_generic(df, mode):
             inst_id = inst_cache[inst_name].instructor_id
 
         # Section
-        sec_key = (course.course_id, section_name)
+        day_short = day[:3] if len(day) >= 3 else day
+        sec_name_with_day = f"{section_name} ({day_short})"
+        sec_key = (course.course_id, sec_name_with_day)
         if sec_key not in section_cache:
             sec = CourseSections.query.filter_by(
-                course_id=course.course_id, section_name=section_name
+                course_id=course.course_id, section_name=sec_name_with_day
             ).first()
             if not sec:
                 sec = CourseSections(
                     course_id=course.course_id,
                     instructor_id=inst_id,
-                    section_name=section_name,
+                    section_name=sec_name_with_day,
                     semester='TBD'
                 )
                 db.session.add(sec)

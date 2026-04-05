@@ -301,9 +301,7 @@ def export_pdf():
             pdf.cell(30, 10, item["Room"], border=1)
             pdf.ln()
             
-        output = io.BytesIO()
-        pdf_content = pdf.output(dest='S').encode('latin-1')
-        output.write(pdf_content)
+        output = io.BytesIO(pdf.output())
         output.seek(0)
         
         return send_file(output, as_attachment=True, download_name="schedule.pdf", mimetype="application/pdf")
