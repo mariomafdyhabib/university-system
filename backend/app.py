@@ -141,51 +141,79 @@ def get_all_sections():
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
+def _get_schedule_details(section_ids):
+    res = []
+    for sid in section_ids:
+        sec = CourseSections.query.get(sid)
+        if not sec: continue
+        crs = Courses.query.get(sec.course_id)
+        inst = Instructors.query.get(sec.instructor_id) if sec.instructor_id else None
+        schs = Schedules.query.filter_by(section_id=sec.section_id).all()
+        for s in schs:
+            res.append({
+                "section_id": sec.section_id,
+                "course_id": crs.course_id if crs else None,
+                "course_code": crs.course_code if crs else "Unknown",
+                "course_name": crs.course_name if crs else "Unknown",
+                "instructor": inst.name if inst else "TBD",
+                "day_of_week": s.day_of_week,
+                "start_time": s.start_time,
+                "end_time": s.end_time,
+                "classroom": s.classroom
+            })
+    return res
+
 @app.route('/generate-schedule', methods=['POST'])
 @login_required
 def generate_schedule():
     data = request.json
-    from scheduler import auto_generate_schedule
-    
-    # Clear existing enrollments for this student first to start fresh
-    Enrollments.query.filter_by(student_id=current_user.student_id).delete()
+    from scheduler import generate_schedule_variants
     
     try:
-        if 'course_sections' in data and data['course_sections']:
-            # Enroll in specific sections
-            section_ids = [int(sid) for sid in data['course_sections']]
+        if 'course_ids' in data and data['course_ids']:
+            course_ids = [int(cid) for cid in data['course_ids']]
+            variants = generate_schedule_variants(current_user.student_id, course_ids)
             
-            # Check for time conflicts among the requested sections
-            from scheduler import parse_time, times_overlap
-            chosen_schedules = Schedules.query.filter(Schedules.section_id.in_(section_ids)).all()
-            
-            for i in range(len(chosen_schedules)):
-                for j in range(i+1, len(chosen_schedules)):
-                    s1 = chosen_schedules[i]
-                    s2 = chosen_schedules[j]
-                    if s1.section_id != s2.section_id and s1.day_of_week == s2.day_of_week:
-                        if times_overlap(parse_time(s1.start_time), parse_time(s1.end_time),
-                                         parse_time(s2.start_time), parse_time(s2.end_time)):
-                            db.session.rollback()
-                            c1 = Courses.query.get(CourseSections.query.get(s1.section_id).course_id)
-                            c2 = Courses.query.get(CourseSections.query.get(s2.section_id).course_id)
-                            msg = f"Time conflict between '{c1.course_name}' and '{c2.course_name}' on {s1.day_of_week}."
-                            return jsonify({"error": msg}), 400
-                            
-            for sec_id in section_ids:
-                enr = Enrollments(student_id=current_user.student_id, section_id=sec_id)
-                db.session.add(enr)
-        elif 'course_ids' in data and data['course_ids']:
-            # Auto-pick sections for these course IDs
-            section_ids = auto_generate_schedule(current_user.student_id, data['course_ids'])
-            for sid in section_ids:
-                enr = Enrollments(student_id=current_user.student_id, section_id=sid)
-                db.session.add(enr)
+            result = {
+                "condensed": {
+                    "section_ids": variants['condensed'],
+                    "entries": _get_schedule_details(variants['condensed'])
+                },
+                "spread": {
+                    "section_ids": variants['spread'],
+                    "entries": _get_schedule_details(variants['spread'])
+                },
+                "moderate": {
+                    "section_ids": variants['moderate'],
+                    "entries": _get_schedule_details(variants['moderate'])
+                }
+            }
+            return jsonify(result)
         else:
-            return jsonify({"error": "No courses or sections provided"}), 400
-            
+            return jsonify({"error": "No courses provided"}), 400
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 400
+
+@app.route('/confirm-schedule', methods=['POST'])
+@login_required
+def confirm_schedule():
+    data = request.json
+    section_ids = data.get('section_ids')
+    if not section_ids:
+        return jsonify({"error": "No sections provided"}), 400
+    
+    try:
+        # Clear existing enrollments
+        Enrollments.query.filter_by(student_id=current_user.student_id).delete()
+        
+        for sid in section_ids:
+            enr = Enrollments(student_id=current_user.student_id, section_id=sid)
+            db.session.add(enr)
+        
         db.session.commit()
-        return jsonify({"message": "Schedule generated successfully"})
+        return jsonify({"message": "Schedule confirmed and enrolled successfully"})
     except Exception as e:
         db.session.rollback()
         return jsonify({"error": str(e)}), 400

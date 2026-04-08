@@ -527,127 +527,173 @@ label {
   color: var(--error);
 }
 
-/* Timetable Grid */
+/* Schedule Flat Table */
 .timetable {
   margin-top: 1rem;
   overflow-x: auto;
 }
 
-.timetable-grid {
-  display: grid;
-  grid-template-columns: 80px repeat(7, 1fr);
-  /* 7 days now matched with DAYS array */
-  grid-template-rows: 40px repeat(12, 48px);
-  /* 12 hours * 48px matched with JS */
-  background: var(--panel-bg);
+/* Schedule Flat Table Refinements */
+.schedule-table-wrapper {
+  overflow-x: auto;
   border-radius: var(--radius);
+  background: rgba(0, 0, 0, 0.2); /* Deepen the background under the table */
   border: 1px solid var(--border);
-  min-width: 900px;
-  position: relative;
+  box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.2);
 }
 
-.timetable-header {
-  grid-row: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 600;
-  color: var(--text-muted);
-  border-bottom: 1px solid var(--border);
-  border-right: 1px solid var(--border);
-  font-size: 0.75rem;
-  text-transform: uppercase;
-  background: rgba(255, 255, 255, 0.05);
+.schedule-flat-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  min-width: 850px;
+  font-size: 0.9rem;
 }
 
-.timetable-timecell {
-  grid-column: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.7rem;
-  color: var(--text-muted);
-  border-right: 1px solid var(--border);
-  border-bottom: 1px solid var(--border);
+.schedule-flat-table thead tr {
   background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(10px);
 }
 
-.timetable-slot {
-  border-right: 1px solid var(--border);
+.schedule-flat-table thead th {
+  padding: 1.25rem 1rem;
+  text-align: center;
+  font-weight: 700;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
   border-bottom: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.01);
+  border-right: 1px solid rgba(255, 255, 255, 0.05);
 }
 
-.timetable-day-column {
-  position: relative;
-  grid-row: 2 / 14;
-  border-right: 1px solid var(--border);
+.schedule-flat-table thead th:first-child {
+  text-align: left;
+  padding-left: 2rem;
 }
 
-.timetable-event {
-  position: absolute;
-  left: 6px;
-  right: 6px;
-  padding: 0.8rem;
-  border-radius: 12px;
-  color: white;
-  font-size: 0.8rem;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  cursor: grab;
-  z-index: 10;
-  overflow: hidden;
-  border-left: 5px solid rgba(255, 255, 255, 0.3);
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+.schedule-flat-table thead th:last-child {
+  border-right: none;
 }
 
-.timetable-event:hover {
-  transform: translateY(-3px) scale(1.03);
-  box-shadow: 0 15px 30px rgba(0, 0, 0, 0.6);
-  z-index: 30;
+.schedule-flat-table tbody tr {
+  transition: all 0.2s ease;
+  cursor: pointer;
 }
 
-.event-title {
-  font-weight: 800;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  font-size: 0.85rem;
-  letter-spacing: 0.3px;
+.schedule-flat-table tbody tr:hover {
+  background: rgba(255, 255, 255, 0.04);
+  transform: scale(1.002);
+  z-index: 5;
 }
 
-.event-meta {
-  font-size: 0.72rem;
-  opacity: 0.95;
-  line-height: 1.4;
+.schedule-flat-table tbody td {
+  padding: 1.1rem 1rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+  border-right: 1px solid rgba(255, 255, 255, 0.03);
+  color: var(--text-main);
+  vertical-align: middle;
+  text-align: center;
+}
+
+.schedule-flat-table tbody td:last-child {
+  border-right: none;
+}
+
+.schedule-flat-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.sft-code {
+  text-align: left !important;
+  padding-left: 2rem !important;
+  font-family: inherit;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.9);
+  color: var(--secondary) !important; /* Use the gold accent for the code */
 }
 
-.event-actions {
-  position: absolute;
-  top: 4px;
-  right: 4px;
-  opacity: 0;
-  transition: opacity 0.2s;
+.sft-name {
+  text-align: left !important;
+  font-weight: 500;
 }
 
-.timetable-event:hover .event-actions {
-  opacity: 1;
+.sft-location {
+  color: var(--text-muted) !important;
+  font-size: 0.85rem;
+  font-weight: 600;
 }
 
-.event-actions button {
-  padding: 2px 4px;
-  font-size: 0.6rem;
-  background: rgba(0, 0, 0, 0.5);
-  border-radius: 4px;
+.sft-day {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.2); /* Very muted when empty */
+  min-width: 140px;
+}
+
+.sft-has-class {
+  color: var(--text-main) !important;
+  font-weight: 700;
+  background: rgba(255, 255, 255, 0.02); /* Slight highlight on active cells */
 }
 
 .hint-text {
-  margin-top: 1.5rem;
-  font-size: 0.875rem;
+  margin-top: 2rem;
+  font-size: 0.9rem;
   color: var(--text-muted);
   text-align: center;
+  font-style: italic;
+  opacity: 0.8;
 }
+
+.hint-text strong {
+  color: var(--secondary);
+  font-style: normal;
+}
+
+/* Variant Selector Tabs */
+.variant-tabs {
+  display: flex;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-bottom: 2rem;
+  background: rgba(0, 0, 0, 0.3);
+  padding: 0.4rem;
+  border-radius: 12px;
+  width: fit-content;
+  margin-left: auto;
+  margin-right: auto;
+  border: 1px solid var(--border);
+}
+
+.variant-tab {
+  padding: 0.6rem 1.5rem;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-muted);
+  font-weight: 600;
+  font-size: 0.85rem;
+  transition: all 0.3s ease;
+  border: none;
+}
+
+.variant-tab:hover {
+  color: var(--text-main);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.variant-tab.active {
+  background: var(--primary);
+  color: white;
+  box-shadow: 0 4px 10px rgba(139, 24, 27, 0.3);
+}
+
+#confirm-schedule-btn {
+  box-shadow: 0 10px 20px -5px rgba(139, 24, 27, 0.4);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+#confirm-schedule-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 15px 25px -5px rgba(139, 24, 27, 0.5);
+  background: var(--primary-hover);
+}
+

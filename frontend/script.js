@@ -81,11 +81,16 @@ function initStudentRegister() {
 }
 
 // Student dashboard
+// Global state for schedule variants
+let currentVariants = null;
+let activeVariantType = 'moderate'; 
+
 function initStudentDashboard() {
   wireSidebarNavigation();
   wireStudentActions();
   wireDashboardGoSchedule();
   wireStudentModal();
+  wireScheduleVariants();
   renderStudentCourses();
   renderStudentSchedule();
 }
@@ -133,104 +138,51 @@ function wireStudentActions() {
     });
   }
 
-  async function doGenerate(courseIds, courseSections) {
-    try {
-      if (courseSections && courseSections.length > 0) {
-        await apiRequest("/generate-schedule", {
-          method: "POST",
-          body: { course_sections: courseSections },
-        });
-        await renderStudentSchedule();
-        return;
-      }
-      if (!courseIds || !courseIds.length) {
-        throw new Error("Select at least one course from the 'Available Courses' list.");
-      }
-      await apiRequest("/generate-schedule", {
-        method: "POST",
-        body: { course_ids: courseIds },
-      });
-      await renderStudentSchedule();
-    } catch (err) {
-      throw err;
-    }
-  }
-
-  function getSelectedForGenerate() {
-    const selected = Array.from(document.querySelectorAll("#courses-section [data-selected-course='true']"));
-    const sections = selected.map((el) => el.dataset.courseSection).filter(Boolean);
-    if (sections.length > 0) return { courseSections: sections };
-    const ids = [...new Set(selected.map((el) => Number(el.dataset.courseId)))].filter(Boolean);
-    return { courseIds: ids };
-  }
 
   const generateBtn = document.getElementById("generate-schedule-btn");
   if (generateBtn) {
     generateBtn.addEventListener("click", async () => {
-      const sel = getSelectedForGenerate();
+      const selected = Array.from(document.querySelectorAll("#selected-courses-list .list-item"));
+      const courseIds = selected.map((el) => Number(el.dataset.courseId)).filter(Boolean);
+      
+      if (courseIds.length === 0) {
+        alert("Please select at least one course first.");
+        return;
+      }
+
       try {
         generateBtn.disabled = true;
         generateBtn.textContent = "Generating...";
-        await doGenerate(sel.courseIds, sel.courseSections);
-        alert("Success! Your schedule has been updated.");
+        
+        const data = await apiRequest("/generate-schedule", {
+          method: "POST",
+          body: { course_ids: courseIds },
+        });
+        
+        currentVariants = data;
+        activeVariantType = 'moderate';
+        
+        // Show the selector and confirm button
+        document.getElementById("variant-selector").classList.remove("hidden");
+        document.getElementById("schedule-actions").classList.remove("hidden");
+        
+        // Switch to the moderate view by default
+        updateVariantTabs();
+        renderTimetableGrid(document.getElementById("timetable"), currentVariants[activeVariantType].entries);
+        
+        // Navigate to schedule section
         const schedTabBtn = document.querySelector('[data-section="schedule-section"]');
         if (schedTabBtn) schedTabBtn.click();
+        
       } catch (err) {
         showConflictModal(err.message);
       } finally {
         generateBtn.disabled = false;
-        generateBtn.textContent = "Generate Schedule";
+        generateBtn.textContent = "Generate AI Schedule";
       }
     });
   }
 
-  const generateBtn2 = document.getElementById("generate-schedule-btn-2");
-  if (generateBtn2) {
-    generateBtn2.addEventListener("click", async () => {
-      const selected = Array.from(document.querySelectorAll("[data-selected-course='true']"));
-      const courseSections = selected.map((el) => el.dataset.courseSection).filter(Boolean);
-      const courseIds = courseSections.length === 0
-        ? [...new Set(selected.map((el) => Number(el.dataset.courseId)))].filter(Boolean)
-        : [];
-      try {
-        await doGenerate(courseIds, courseSections.length ? courseSections : undefined);
-        alert("Success! Your schedule has been updated.");
-        const schedTabBtn = document.querySelector('[data-section="schedule-section"]');
-        if (schedTabBtn) schedTabBtn.click();
-      } catch (err) {
-        showConflictModal(err.message);
-      }
-    });
-  }
-
-  const regenerateBtn = document.getElementById("regenerate-schedule-btn");
-  if (regenerateBtn) {
-    regenerateBtn.addEventListener("click", async () => {
-      try {
-        const schedule = await apiRequest("/schedule");
-        const bySection = schedule.some((e) => e.course_section != null);
-        if (bySection) {
-          const courseSections = [...new Set(schedule.map((e) => e.course_section).filter(Boolean))];
-          if (!courseSections.length) {
-            alert("No courses in your schedule. Select courses and Generate first.");
-            return;
-          }
-          await apiRequest("/generate-schedule", { method: "POST", body: { course_sections: courseSections } });
-        } else {
-          const courseIds = [...new Set(schedule.map((e) => e.course_id).filter(Boolean))];
-          if (!courseIds.length) {
-            alert("No courses in your schedule. Select courses and Generate first.");
-            return;
-          }
-          await apiRequest("/generate-schedule", { method: "POST", body: { course_ids: courseIds } });
-        }
-        await renderStudentSchedule();
-        alert("Schedule regenerated.");
-      } catch (err) {
-        showConflictModal(err.message);
-      }
-    });
-  }
 
   const exportPdfBtn = document.getElementById("export-pdf-btn");
   if (exportPdfBtn) {
@@ -282,24 +234,15 @@ async function renderStudentCourses() {
   if (!coursesContainer || !selectedContainer) return;
   coursesContainer.textContent = "Loading courses...";
   try {
-    const [courses, sections] = await Promise.all([
-      apiRequest("/courses"),
-      apiRequest("/sections"),
-    ]);
+    const courses = await apiRequest("/courses");
     coursesContainer.textContent = "";
-    // Group sections by course_id for easier rendering
-    const sectionsByCourse = {};
-    if (sections && sections.length) {
-      sections.forEach((s) => {
-        if (!sectionsByCourse[s.course_id]) sectionsByCourse[s.course_id] = [];
-        sectionsByCourse[s.course_id].push(s);
-      });
-    }
+
     courses.forEach((c) => {
       const item = document.createElement("div");
       item.className = "list-item";
       item.dataset.courseId = c.course_id != null ? c.course_id : "";
       item.dataset.courseName = c.course_name || "";
+      
       const main = document.createElement("div");
       main.className = "list-item-main";
       const dept = c.department != null ? c.department : "";
@@ -307,47 +250,11 @@ async function renderStudentCourses() {
       main.innerHTML = `<strong>${escapeHtml(c.course_code || c.course_name)} – ${escapeHtml(c.course_name)}</strong><br/>${dept ? `<span class="badge">${escapeHtml(dept)}</span> • ` : ""}${escapeHtml(cred)}`;
       item.appendChild(main);
 
-      const courseSections = sectionsByCourse[c.course_id];
-      if (courseSections && courseSections.length) {
-        const sel = document.createElement("select");
-        sel.className = "course-section-select";
-        courseSections.forEach((sec) => {
-          const opt = document.createElement("option");
-          opt.value = sec.section_id;
-          const sched = (sec.schedules || []).map(s => `${s.day_of_week.substring(0, 3)} ${s.start_time}`).join(", ");
-          opt.textContent = `Sec ${sec.section_name || '?'}: ${sched} (${sec.instructor})`;
-          sel.appendChild(opt);
-        });
-        item.appendChild(sel);
-        const btn = document.createElement("button");
-        btn.textContent = "Select";
-        btn.addEventListener("click", () => {
-          const courseSection = sel.value;
-          if (!courseSection) return;
-          item.dataset.courseSection = courseSection;
-          item.dataset.selectedCourse = "true";
-          btn.textContent = "Selected";
-          const clone = item.cloneNode(true);
-          clone.dataset.selectedCourse = "true";
-          clone.dataset.courseSection = courseSection;
-          clone.querySelector("button").textContent = "Remove";
-          clone.querySelector("button").addEventListener("click", () => {
-            clone.remove();
-            item.dataset.selectedCourse = "false";
-            item.dataset.courseSection = "";
-            btn.textContent = "Select";
-          });
-          const existing = selectedContainer.querySelector(`[data-course-section="${courseSection}"]`);
-          if (existing) existing.remove();
-          selectedContainer.appendChild(clone);
-        });
-        item.appendChild(btn);
-      } else {
-        const btn = document.createElement("button");
-        btn.textContent = "Select";
-        btn.addEventListener("click", () => toggleCourseSelection(item, selectedContainer));
-        item.appendChild(btn);
-      }
+      const btn = document.createElement("button");
+      btn.textContent = "Select";
+      btn.addEventListener("click", () => toggleCourseSelection(item, selectedContainer));
+      item.appendChild(btn);
+      
       coursesContainer.appendChild(item);
     });
   } catch (err) {
@@ -369,6 +276,10 @@ function toggleCourseSelection(item, selectedContainer) {
     item.querySelector("button").textContent = "Selected";
     const clone = item.cloneNode(true);
     clone.dataset.selectedCourse = "true";
+    clone.querySelector("button").textContent = "Remove";
+    clone.querySelector("button").addEventListener("click", () => {
+      toggleCourseSelection(item, selectedContainer);
+    });
     selectedContainer.appendChild(clone);
   }
 }
@@ -376,15 +287,73 @@ function toggleCourseSelection(item, selectedContainer) {
 async function renderStudentSchedule() {
   const timetableEl = document.getElementById("timetable");
   if (!timetableEl) return;
+  
+  // If we have variants in memory (preview mode), don't fetch from server
+  if (currentVariants) {
+    renderTimetableGrid(timetableEl, currentVariants[activeVariantType].entries);
+    return;
+  }
+
   timetableEl.textContent = "Loading schedule...";
   try {
     const data = await apiRequest("/schedule");
     timetableEl.textContent = "";
+    
+    // Hide variant controls when viewing a saved schedule
+    document.getElementById("variant-selector").classList.add("hidden");
+    document.getElementById("schedule-actions").classList.add("hidden");
+    
     renderTimetableGrid(timetableEl, data);
     updateDashboardCourseCount(data);
   } catch (err) {
     timetableEl.textContent = err.message;
   }
+}
+
+function wireScheduleVariants() {
+  const tabs = document.querySelectorAll(".variant-tab");
+  tabs.forEach(tab => {
+    tab.addEventListener("click", () => {
+      if (!currentVariants) return;
+      activeVariantType = tab.dataset.variant;
+      updateVariantTabs();
+      renderTimetableGrid(document.getElementById("timetable"), currentVariants[activeVariantType].entries);
+    });
+  });
+
+  const confirmBtn = document.getElementById("confirm-schedule-btn");
+  if (confirmBtn) {
+    confirmBtn.addEventListener("click", async () => {
+      if (!currentVariants || !activeVariantType) return;
+      const sectionIds = currentVariants[activeVariantType].section_ids;
+      
+      try {
+        confirmBtn.disabled = true;
+        confirmBtn.textContent = "Confirming...";
+        
+        await apiRequest("/confirm-schedule", {
+          method: "POST",
+          body: { section_ids: sectionIds }
+        });
+        
+        alert("Success! Your schedule has been saved.");
+        currentVariants = null; // Clear variants to show the saved one
+        await renderStudentSchedule();
+      } catch (err) {
+        alert(err.message);
+      } finally {
+        confirmBtn.disabled = false;
+        confirmBtn.textContent = "Confirm & Enroll";
+      }
+    });
+  }
+}
+
+function updateVariantTabs() {
+  const tabs = document.querySelectorAll(".variant-tab");
+  tabs.forEach(tab => {
+    tab.classList.toggle("active", tab.dataset.variant === activeVariantType);
+  });
 }
 
 function updateDashboardCourseCount(entries) {
@@ -422,66 +391,17 @@ function escapeHtml(s) {
   div.textContent = s;
   return div.innerHTML;
 }
+const TABLE_DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday"];
+
 function renderTimetableGrid(container, entries) {
-  const grid = document.createElement("div");
-  grid.className = "timetable-grid";
-
-  const corner = document.createElement("div");
-  corner.className = "timetable-corner";
-  corner.style.gridColumn = "1";
-  corner.style.gridRow = "1";
-  grid.appendChild(corner);
-
-  DAYS.forEach((day, idx) => {
-    const h = document.createElement("div");
-    h.className = "timetable-header";
-    h.textContent = day;
-    h.style.gridColumn = String(idx + 2);
-    h.style.gridRow = "1";
-    grid.appendChild(h);
-  });
-
-  let row = 2;
-  for (let minutes = START_MINUTES; minutes < END_MINUTES; minutes += 60) {
-    const hourLabel = document.createElement("div");
-    hourLabel.className = "timetable-timecell";
-    hourLabel.style.gridColumn = "1";
-    hourLabel.style.gridRow = String(row);
-    const h12 = ((minutes / 60 + 11) % 12) + 1;
-    const ampm = minutes / 60 >= 12 ? "PM" : "AM";
-    hourLabel.textContent = `${String(h12).padStart(2, "0")}:00 ${ampm}`;
-    grid.appendChild(hourLabel);
-    for (let d = 0; d < 7; d++) {
-      const cell = document.createElement("div");
-      cell.className = "timetable-slot";
-      cell.style.gridColumn = String(d + 2);
-      cell.style.gridRow = String(row);
-      grid.appendChild(cell);
-    }
-    row += 1;
+  container.innerHTML = "";
+  if (!entries || entries.length === 0) {
+    container.innerHTML = `<p style="text-align:center;color:var(--text-muted);padding:2rem;">No courses scheduled yet.</p>`;
+    return;
   }
 
-  DAYS.forEach((day, idx) => {
-    const col = document.createElement("div");
-    col.className = "timetable-day-column";
-    col.dataset.day = day;
-    col.style.gridColumn = String(idx + 2);
-    col.style.gridRow = "2 / 14";
-    col.style.position = "relative";
-    grid.appendChild(col);
-  });
-  container.appendChild(grid);
-
-  const dayColumns = {};
-  grid.querySelectorAll(".timetable-day-column").forEach((col) => {
-    dayColumns[col.dataset.day] = col;
-  });
-  const heightPx = HOUR_HEIGHT * 12;
-
-  const colorMap = {};
-  const baseColors = ["#3b82f6", "#8b5cf6", "#22c55e", "#f97316", "#ec4899"];
-  let colorIndex = 0;
-
+  // Group entries by section_id (or course_code+section_name combo)
+  const sectionMap = {};
   const abbrMap = {
     "sat": "Saturday", "sun": "Sunday", "mon": "Monday",
     "tue": "Tuesday", "wed": "Wednesday", "thu": "Thursday",
@@ -489,54 +409,67 @@ function renderTimetableGrid(container, entries) {
   };
 
   entries.forEach((entry) => {
-    const daysArr = (entry.day_of_week || "").split(",").map(d => d.trim().toLowerCase());
+    const key = entry.section_id != null
+      ? String(entry.section_id)
+      : `${entry.course_code}|${entry.section_name || ""}`;
 
+    if (!sectionMap[key]) {
+      sectionMap[key] = {
+        entry,
+        days: {}
+      };
+    }
+
+    const daysArr = (entry.day_of_week || "").split(",").map(d => d.trim().toLowerCase());
     daysArr.forEach(d => {
       const fullDay = abbrMap[d] || (d.charAt(0).toUpperCase() + d.slice(1));
-      const dayCol = dayColumns[fullDay] || dayColumns[
-        Object.keys(dayColumns).find(k => k.toLowerCase() === fullDay.toLowerCase())
-      ];
-      if (!dayCol) return;
-
-      const startMin = parseTime12(entry.start_time);
-      const endMin = parseTime12(entry.end_time);
-      const top = ((startMin - START_MINUTES) / MINUTES_RANGE) * heightPx;
-      const height = Math.max(((endMin - startMin) / MINUTES_RANGE) * heightPx, 32);
-
-      if (!colorMap[entry.course_code]) {
-        colorMap[entry.course_code] = baseColors[colorIndex % baseColors.length];
-        colorIndex += 1;
-      }
-      const block = document.createElement("div");
-      block.className = "timetable-event";
-      block.style.top = `${top}px`;
-      block.style.height = `${height}px`;
-      block.style.background = colorMap[entry.course_code];
-      block.dataset.sectionId = entry.section_id;
-      block.dataset.enrollmentId = entry.enrollment_id;
-      block.dataset.courseId = entry.course_id != null ? entry.course_id : "";
-      block.dataset.day = entry.day_of_week;
-      block.dataset.startMinutes = String(startMin);
-      block.dataset.endMinutes = String(endMin);
-      block.innerHTML = `
-        <div class="event-title">${escapeHtml(entry.course_name)}</div>
-        <div class="event-meta">${escapeHtml(entry.instructor || "")}</div>
-        <div class="event-meta">${escapeHtml(entry.classroom || "")}</div>
-        <div class="event-meta">${entry.start_time} – ${entry.end_time}</div>
-        <div class="event-actions">
-
-        <button type="button" data-action="delete" class="secondary">Remove</button>
-      </div>
-    `;
-
-      block.addEventListener("click", () => {
-        showEventDetail(entry);
-      });
-
-      attachEventActions(block);
-      dayCol.appendChild(block);
+      const timeStr = `${entry.start_time} - ${entry.end_time}`;
+      sectionMap[key].days[fullDay] = timeStr;
     });
   });
+
+  const wrapper = document.createElement("div");
+  wrapper.className = "schedule-table-wrapper";
+
+  const table = document.createElement("table");
+  table.className = "schedule-flat-table";
+
+  // Header
+  const thead = document.createElement("thead");
+  thead.innerHTML = `
+    <tr>
+      <th>Course &amp; Section</th>
+      <th>Course Name</th>
+      <th>Location</th>
+      ${TABLE_DAYS.map(d => `<th>${d}</th>`).join("")}
+    </tr>
+  `;
+  table.appendChild(thead);
+
+  // Body
+  const tbody = document.createElement("tbody");
+  Object.values(sectionMap).forEach(({ entry, days }) => {
+    const tr = document.createElement("tr");
+    tr.dataset.enrollmentId = entry.enrollment_id;
+    tr.dataset.sectionId = entry.section_id;
+
+    const sectionLabel = entry.section_name
+      ? `${escapeHtml(entry.course_code)} – ${escapeHtml(entry.section_name)}`
+      : escapeHtml(entry.course_code || "");
+
+    tr.innerHTML = `
+      <td class="sft-code"><strong>${sectionLabel}</strong></td>
+      <td class="sft-name">${escapeHtml(entry.course_name || "")}</td>
+      <td class="sft-location">${escapeHtml(entry.classroom || "—")}</td>
+      ${TABLE_DAYS.map(d => `<td class="sft-day${days[d] ? " sft-has-class" : ""}">${days[d] ? escapeHtml(days[d]) : ""}</td>`).join("")}
+    `;
+
+    tr.addEventListener("click", () => showEventDetail(entry));
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);
+  wrapper.appendChild(table);
+  container.appendChild(wrapper);
 }
 
 function showEventDetail(entry) {
@@ -571,9 +504,32 @@ function showEventDetail(entry) {
         <span class="modal-detail-label">Section</span>
         <span class="modal-detail-value">${escapeHtml(entry.section_name)}</span>
       </div>` : ""}
+      
+      <div style="margin-top: 2rem; display: flex; gap: 1rem;">
+        <button id="modal-delete-btn" class="secondary" style="color: var(--error); flex: 1; border-color: var(--error);">Remove Course</button>
+        <button class="primary" style="flex: 1;" onclick="studentCloseModal()">Close</button>
+      </div>
     </div>
   `;
   studentShowModal(entry.course_name, bodyHtml);
+
+  // Wire up delete button in modal
+  const delBtn = document.getElementById("modal-delete-btn");
+  if (delBtn) {
+    delBtn.addEventListener("click", async () => {
+      if (!confirm(`Are you sure you want to remove ${entry.course_name}?`)) return;
+      try {
+        await apiRequest("/edit-schedule", {
+          method: "POST",
+          body: { action: "delete", enrollment_id: entry.enrollment_id },
+        });
+        studentCloseModal();
+        await renderStudentSchedule();
+      } catch (err) {
+        alert(err.message);
+      }
+    });
+  }
 }
 
 function studentShowModal(title, bodyHtml) {

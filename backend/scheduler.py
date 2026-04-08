@@ -80,42 +80,119 @@ def check_student_conflict(student_id, section_id):
                         return True
     return False
 
+def generate_schedule_variants(student_id, course_ids):
+    """
+    Finds all valid combinations of sections for the given course_ids.
+    Returns 3 options: Condensed, Spread, Moderate.
+    """
+    from database import CourseSections, Schedules
+    
+    # 1. Fetch all sections and their schedules for the requested courses
+    course_sections_data = {}
+    for cid in course_ids:
+        secs = CourseSections.query.filter_by(course_id=cid).all()
+        sec_list = []
+        for s in secs:
+            schs = Schedules.query.filter_by(section_id=s.section_id).all()
+            sch_details = [{
+                'day': sch.day_of_week,
+                'start': parse_time(sch.start_time),
+                'end': parse_time(sch.end_time)
+            } for sch in schs]
+            sec_list.append({
+                'section_id': s.section_id,
+                'schedules': sch_details
+            })
+        course_sections_data[cid] = sec_list
+
+    # 2. Backtracking to find all valid combinations
+    all_valid_combinations = []
+    course_id_list = list(course_sections_data.keys())
+
+    def find_combinations(index, current_sections, current_schedules):
+        if index == len(course_id_list):
+            all_valid_combinations.append(list(current_sections))
+            return
+
+        cid = course_id_list[index]
+        for sec in course_sections_data[cid]:
+            # Check for conflict with already chosen sections
+            conflict = False
+            for ns in sec['schedules']:
+                for es in current_schedules:
+                    if ns['day'] == es['day']:
+                        if times_overlap(ns['start'], ns['end'], es['start'], es['end']):
+                            conflict = True
+                            break
+                if conflict: break
+            
+            if not conflict:
+                find_combinations(
+                    index + 1, 
+                    current_sections + [sec['section_id']], 
+                    current_schedules + sec['schedules']
+                )
+
+    find_combinations(0, [], [])
+
+    if not all_valid_combinations:
+        raise Exception("Could not find any non-conflicting combination of sections for these courses.")
+
+    # 3. Score and pick variants
+    def evaluate_schedule(section_ids):
+        # We need the schedule details to calculate metrics
+        schedules = []
+        for sid in section_ids:
+            schs = Schedules.query.filter_by(section_id=sid).all()
+            for sch in schs:
+                schedules.append({
+                    'day': sch.day_of_week,
+                    'start': parse_time(sch.start_time),
+                    'end': parse_time(sch.end_time)
+                })
+        
+        days = {}
+        for s in schedules:
+            if s['day'] not in days:
+                days[s['day']] = {'min': s['start'], 'max': s['end']}
+            else:
+                days[s['day']]['min'] = min(days[s['day']]['min'], s['start'])
+                days[s['day']]['max'] = max(days[s['day']]['max'], s['end'])
+        
+        num_days = len(days)
+        total_span = sum(d['max'] - d['min'] for d in days.values())
+        return num_days, total_span
+
+    # Score all combinations
+    scored_combinations = []
+    for combo in all_valid_combinations:
+        num_days, total_span = evaluate_schedule(combo)
+        scored_combinations.append({
+            'section_ids': combo,
+            'num_days': num_days,
+            'total_span': total_span
+        })
+
+    # Sort for variants
+    # Condensed: Min days, then min total_span
+    condensed = sorted(scored_combinations, key=lambda x: (x['num_days'], x['total_span']))[0]
+    
+    # Spread: Max days, then max total_span (or just max total_span)
+    spread = sorted(scored_combinations, key=lambda x: (x['num_days'], x['total_span']), reverse=True)[0]
+    
+    # Moderate: Middle of the list after sorting by days
+    sorted_by_days = sorted(scored_combinations, key=lambda x: x['num_days'])
+    moderate = sorted_by_days[len(sorted_by_days) // 2]
+
+    return {
+        "condensed": condensed['section_ids'],
+        "spread": spread['section_ids'],
+        "moderate": moderate['section_ids']
+    }
+
 def auto_generate_schedule(student_id, course_ids):
     """
-    For a list of course_ids, attempts to find one section per course that doesn't conflict.
-    Returns list of chosen section_ids.
+    Backward compatibility or simple default.
     """
-    from database import Enrollments, CourseSections
-    chosen_sections = []
-    
-    # First, clear existing enrollments for these courses or all? 
-    # Usually safer to clear all for 'Regenerate' or just the ones being added.
-    # The frontend 'Regenerate' logic suggests starting fresh.
-    
-    for cid in course_ids:
-        sections = CourseSections.query.filter_by(course_id=cid).all()
-        found = False
-        for sec in sections:
-            # Check conflict with what we've already chosen in this loop
-            local_conflict = False
-            new_schedules = Schedules.query.filter_by(section_id=sec.section_id).all()
-            for chosen_id in chosen_sections:
-                existing_schedules = Schedules.query.filter_by(section_id=chosen_id).all()
-                for ns in new_schedules:
-                    for es in existing_schedules:
-                        if ns.day_of_week == es.day_of_week:
-                            if times_overlap(parse_time(ns.start_time), parse_time(ns.end_time),
-                                             parse_time(es.start_time), parse_time(es.end_time)):
-                                local_conflict = True
-                                break
-                    if local_conflict: break
-                if local_conflict: break
-            
-            if not local_conflict:
-                chosen_sections.append(sec.section_id)
-                found = True
-                break
-        if not found:
-            raise Exception(f"Could not find a non-conflicting section for course ID {cid}")
-            
-    return chosen_sections
+    variants = generate_schedule_variants(student_id, course_ids)
+    return variants['moderate']
