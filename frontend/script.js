@@ -292,6 +292,10 @@ function toggleCourseSelection(item, selectedContainer) {
     );
     if (selectedItem) selectedItem.remove();
   } else {
+    if (selectedContainer.children.length >= 5) {
+      alert("Maximum 5 courses allowed.");
+      return;
+    }
     item.dataset.selectedCourse = "true";
     item.querySelector("button").textContent = "Selected";
     const clone = item.cloneNode(true);

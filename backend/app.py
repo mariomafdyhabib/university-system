@@ -187,6 +187,8 @@ def generate_schedule():
     try:
         if 'course_ids' in data and data['course_ids']:
             course_ids = [int(cid) for cid in data['course_ids']]
+            if len(course_ids) > 5:
+                return jsonify({"error": "Maximum 5 courses allowed."}), 400
             variants = generate_schedule_variants(current_user.student_id, course_ids)
             
             result = {
