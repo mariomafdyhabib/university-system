@@ -39,6 +39,11 @@ class Instructors(db.Model):
     instructor_id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
 
+class Majors(db.Model):
+    __tablename__ = 'majors'
+    major_id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), unique=True, nullable=False)
+
 class CourseSections(db.Model):
     __tablename__ = 'course_sections'
     section_id = db.Column(db.Integer, primary_key=True)

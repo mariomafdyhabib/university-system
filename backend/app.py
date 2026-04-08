@@ -8,7 +8,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../database')))
 
-from database import db, Students, Admins, Courses, Enrollments, CourseSections, Schedules, Instructors, CourseScheduleSystem, CourseScheduleStudent
+from database import db, Students, Admins, Courses, Enrollments, CourseSections, Schedules, Instructors, Majors, CourseScheduleSystem, CourseScheduleStudent
 import scheduler
 import course_upload
 from admin_routes import admin_bp
@@ -91,6 +91,21 @@ def login():
 def logout():
     logout_user()
     return jsonify({'message': 'Logged out'})
+
+@app.route('/majors', methods=['GET'])
+def get_majors():
+    majors = Majors.query.all()
+    if not majors:
+        # Initialize from courses if empty
+        depts = db.session.query(Courses.department).distinct().all()
+        for d in depts:
+            if d[0]:
+                new_major = Majors(name=d[0])
+                db.session.add(new_major)
+        db.session.commit()
+        majors = Majors.query.all()
+    
+    return jsonify([{'id': m.major_id, 'name': m.name} for m in majors])
 
 @app.route('/courses', methods=['GET'])
 @login_required

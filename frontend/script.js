@@ -65,7 +65,27 @@ function initStudentLogin() {
 function initStudentRegister() {
   const form = document.getElementById("register-form");
   const errorBox = document.getElementById("register-error");
+  const majorSelect = document.getElementById("reg-major");
   if (!form) return;
+
+  // Fetch and populate majors
+  if (majorSelect) {
+    apiRequest("/majors")
+      .then((majors) => {
+        majorSelect.innerHTML = '<option value="" disabled selected>Select Major</option>';
+        majors.forEach((m) => {
+          const opt = document.createElement("option");
+          opt.value = m.name; // Using name instead of ID as existing logic expects string major_id
+          opt.textContent = m.name;
+          majorSelect.appendChild(opt);
+        });
+      })
+      .catch((err) => {
+        console.error("Failed to load majors:", err);
+        majorSelect.innerHTML = '<option value="" disabled>Failed to load majors</option>';
+      });
+  }
+
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
     errorBox.textContent = "";
