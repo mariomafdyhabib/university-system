@@ -27,12 +27,18 @@
           <label for="reg-password">Password</label>
           <input type="password" id="reg-password" name="password" placeholder="••••••••" required />
         </div>
+        <div class="form-group">
+          <label for="reg-college">Academic College</label>
+          <select id="reg-college" name="college_id" required>
+            <option value="" disabled selected>Select College</option>
+            <option value="">Loading colleges...</option>
+          </select>
+        </div>
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
           <div class="form-group">
             <label for="reg-major">Academic Major</label>
-            <select id="reg-major" name="major_id" required>
-              <option value="" disabled selected>Select Major</option>
-              <option value="">Loading...</option>
+            <select id="reg-major" name="major_id" required disabled>
+              <option value="" disabled selected>Select College first</option>
             </select>
           </div>
           <div class="form-group">

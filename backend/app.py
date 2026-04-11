@@ -8,7 +8,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../database')))
 
-from database import db, Students, Admins, Courses, Enrollments, CourseSections, Schedules, Instructors, Majors, CourseScheduleSystem, CourseScheduleStudent
+from database import db, Students, Admins, Courses, Enrollments, CourseSections, Schedules, Instructors, Majors, Colleges, CourseScheduleSystem, CourseScheduleStudent
 import scheduler
 import course_upload
 from admin_routes import admin_bp
@@ -67,6 +67,7 @@ def register():
         name=data['name'],
         email=data['email'],
         password_hash=hashed_password,
+        college_id=data.get('college_id'),
         major_id=data.get('major_id'),
         year=data.get('year')
     )
@@ -92,20 +93,69 @@ def logout():
     logout_user()
     return jsonify({'message': 'Logged out'})
 
+@app.route('/colleges', methods=['GET'])
+def get_colleges():
+    colleges = Colleges.query.all()
+    if not colleges:
+        _initialize_colleges_and_majors()
+        colleges = Colleges.query.all()
+    return jsonify([{'id': c.college_id, 'name': c.name} for c in colleges])
+
 @app.route('/majors', methods=['GET'])
 def get_majors():
-    majors = Majors.query.all()
-    if not majors:
-        # Initialize from courses if empty
-        depts = db.session.query(Courses.department).distinct().all()
-        for d in depts:
-            if d[0]:
-                new_major = Majors(name=d[0])
-                db.session.add(new_major)
-        db.session.commit()
+    college_id = request.args.get('college_id')
+    query = Majors.query
+    if college_id:
+        query = query.filter_by(college_id=int(college_id))
+    
+    majors = query.all()
+    if not majors and not college_id:
+        _initialize_colleges_and_majors()
         majors = Majors.query.all()
     
     return jsonify([{'id': m.major_id, 'name': m.name} for m in majors])
+
+def _initialize_colleges_and_majors():
+    data = {
+        "College of Engineering": [
+            "Industrial Engineering",
+            "Biomedical Engineering",
+            "Electrical & Computer Engineering",
+            "Computer Science & Cyber Security",
+            "Architecture & Design",
+            "Civil & Architectural Engineering"
+        ],
+        "College of Business": [
+            "Accounting",
+            "Information Systems",
+            "Finance & FinTech",
+            "Supply Chain Management & Logistics",
+            "Banking & Investment Management",
+            "Healthcare Management",
+            "Marketing"
+        ],
+        "College of Arts": [
+            "English Language",
+            "Communication Sciences & Disorders",
+            "Media",
+            "Sociology & Social Services"
+        ]
+    }
+    
+    for c_name, m_list in data.items():
+        college = Colleges.query.filter_by(name=c_name).first()
+        if not college:
+            college = Colleges(name=c_name)
+            db.session.add(college)
+            db.session.commit()
+        
+        for m_name in m_list:
+            major = Majors.query.filter_by(name=m_name).first()
+            if not major:
+                major = Majors(name=m_name, college_id=college.college_id)
+                db.session.add(major)
+    
+    db.session.commit()
 
 @app.route('/courses', methods=['GET'])
 @login_required
@@ -171,6 +221,7 @@ def _get_schedule_details(section_ids):
                 "course_code": crs.course_code if crs else "Unknown",
                 "course_name": crs.course_name if crs else "Unknown",
                 "instructor": inst.name if inst else "TBD",
+                "section_name": sec.section_name or "",
                 "day_of_week": s.day_of_week,
                 "start_time": s.start_time,
                 "end_time": s.end_time,
@@ -308,49 +359,127 @@ def clear_schedule():
 def export_pdf():
     try:
         enrolls = Enrollments.query.filter_by(student_id=current_user.student_id).all()
-        unique_section_ids = {enr.section_id for enr in enrolls}
-        data = []
-        for sec_id in unique_section_ids:
-            sec = CourseSections.query.get(sec_id)
+        # Group by section exactly like the frontend
+        section_map = {}
+        abbr_map = {
+            "sat": "Saturday", "sun": "Sunday", "mon": "Monday",
+            "tue": "Tuesday", "wed": "Wednesday", "thu": "Thursday",
+            "fri": "Friday"
+        }
+        table_days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday"]
+
+        for enr in enrolls:
+            sec = CourseSections.query.get(enr.section_id)
             if not sec: continue
             crs = Courses.query.get(sec.course_id)
             schs = Schedules.query.filter_by(section_id=sec.section_id).all()
+            
+            key = str(sec.section_id)
+            if key not in section_map:
+                section_map[key] = {
+                    "code": crs.course_code,
+                    "name": crs.course_name,
+                    "section": sec.section_name or "",
+                    "classroom": "",
+                    "days": {d: "" for d in table_days}
+                }
+            
             for s in schs:
-                data.append({
-                    "Course": f"{crs.course_code} - {crs.course_name}",
-                    "Day": s.day_of_week,
-                    "Time": f"{s.start_time} - {s.end_time}",
-                    "Room": s.classroom
-                })
+                section_map[key]["classroom"] = s.classroom or section_map[key]["classroom"]
+                days_arr = [d.strip().lower() for d in (s.day_of_week or "").split(",")]
+                for d in days_arr:
+                    full_day = abbr_map.get(d, d.capitalize())
+                    if full_day in table_days:
+                        section_map[key]["days"][full_day] = f"{s.start_time} - {s.end_time}"
         
-        pdf = FPDF()
+        pdf = FPDF(orientation='L', unit='mm', format='A4') # Landscape for more space
         pdf.add_page()
-        pdf.set_font("Arial", 'B', 16)
-        pdf.cell(0, 10, "International University of Kuwait (IUK)", ln=True, align='C')
-        pdf.set_font("Arial", 'B', 14)
-        pdf.cell(0, 10, "Student Weekly Schedule", ln=True, align='C')
+        
+        # Header
+        pdf.set_fill_color(30, 41, 59) # Dark blue/slate
+        pdf.rect(0, 0, 297, 40, 'F') # 297 is A4 Landscape width
+        
+        pdf.set_text_color(255, 255, 255)
+        pdf.set_font("Arial", 'B', 24)
+        pdf.cell(0, 15, "IUK University", ln=True, align='C')
+        pdf.set_font("Arial", '', 14)
+        pdf.cell(0, 5, "International University of Kuwait", ln=True, align='C')
+        pdf.cell(0, 10, "Student Weekly Timetable Grid", ln=True, align='C')
         pdf.ln(10)
         
+        pdf.set_text_color(0, 0, 0)
         pdf.set_font("Arial", 'B', 12)
-        pdf.cell(80, 10, "Course", border=1)
-        pdf.cell(30, 10, "Day", border=1)
-        pdf.cell(50, 10, "Time", border=1)
-        pdf.cell(30, 10, "Room", border=1)
-        pdf.ln()
+        pdf.cell(0, 10, f"Issued to: {current_user.name}", ln=True)
+        pdf.ln(2)
+
+        # Table Header
+        # Adjusted widths for Landscape (Total ~277mm available)
+        w_code = 35
+        w_name = 55
+        w_loc = 25
+        w_day = 32 # 5 days * 32 = 160
+        # Total: 35+55+25+160 = 275mm
         
-        pdf.set_font("Arial", '', 10)
-        for item in data:
-            pdf.cell(80, 10, item["Course"], border=1)
-            pdf.cell(30, 10, item["Day"], border=1)
-            pdf.cell(50, 10, item["Time"], border=1)
-            pdf.cell(30, 10, item["Room"], border=1)
+        pdf.set_fill_color(30, 41, 59) # Header background
+        pdf.set_text_color(255, 255, 255) # Header text
+        pdf.set_font("Arial", 'B', 9)
+        pdf.cell(w_code, 12, " Course & Sec", border=1, fill=True)
+        pdf.cell(w_name, 12, " Course Name", border=1, fill=True)
+        pdf.cell(w_loc, 12, " Location", border=1, fill=True)
+        for d in table_days:
+            pdf.cell(w_day, 12, f" {d.upper()}", border=1, fill=True, align='C')
+        pdf.ln()
+
+        # Reset text color for body
+        pdf.set_text_color(0, 0, 0)
+        
+        # Table Body
+        pdf.set_font("Arial", '', 8)
+        fill = False
+        sorted_sections = sorted(section_map.values(), key=lambda x: (x['code'], x['section']))
+        for sec_data in sorted_sections:
+            pdf.set_fill_color(248, 250, 252) if fill else pdf.set_fill_color(255, 255, 255)
+            
+            # Course & Sec
+            label = f"{sec_data['code']}"
+            if sec_data['section']: label += f" - {sec_data['section']}"
+            
+            # Use multi_cell for long names if needed, but for simplicity we'll use cell
+            # or custom height
+            h = 15
+            
+            curr_x = pdf.get_x()
+            curr_y = pdf.get_y()
+            
+            pdf.cell(w_code, h, f" {label}", border=1, fill=True)
+            pdf.cell(w_name, h, f" {sec_data['name'][:30]}", border=1, fill=True)
+            pdf.cell(w_loc, h, f" {sec_data['classroom']}", border=1, fill=True)
+            
+            for d in table_days:
+                time_str = sec_data["days"][d]
+                if time_str:
+                    pdf.set_font("Arial", 'B', 7)
+                    pdf.cell(w_day, h, time_str, border=1, fill=True, align='C')
+                    pdf.set_font("Arial", '', 8)
+                else:
+                    pdf.cell(w_day, h, "", border=1, fill=True)
+            
             pdf.ln()
+            fill = not fill
+            
+        # Footer
+        pdf.set_y(-25)
+        pdf.set_font("Arial", 'I', 8)
+        pdf.set_text_color(160, 160, 160)
+        pdf.cell(0, 10, "International University of Kuwait - Official AI Generated Schedule", ln=True, align='C')
             
         output = io.BytesIO(pdf.output())
         output.seek(0)
         
-        return send_file(output, as_attachment=True, download_name="schedule.pdf", mimetype="application/pdf")
+        return send_file(output, as_attachment=True, download_name=f"Schedule_Grid_{current_user.name.replace(' ', '_')}.pdf", mimetype="application/pdf")
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return jsonify({"error": f"PDF Export Failed: {str(e)}"}), 500
 
 @app.route('/schedule/export/excel', methods=['GET'])

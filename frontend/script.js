@@ -65,25 +65,50 @@ function initStudentLogin() {
 function initStudentRegister() {
   const form = document.getElementById("register-form");
   const errorBox = document.getElementById("register-error");
+  const collegeSelect = document.getElementById("reg-college");
   const majorSelect = document.getElementById("reg-major");
   if (!form) return;
 
-  // Fetch and populate majors
-  if (majorSelect) {
-    apiRequest("/majors")
-      .then((majors) => {
-        majorSelect.innerHTML = '<option value="" disabled selected>Select Major</option>';
-        majors.forEach((m) => {
+  // Fetch and populate colleges
+  if (collegeSelect) {
+    apiRequest("/colleges")
+      .then((colleges) => {
+        collegeSelect.innerHTML = '<option value="" disabled selected>Select College</option>';
+        colleges.forEach((c) => {
           const opt = document.createElement("option");
-          opt.value = m.name; // Using name instead of ID as existing logic expects string major_id
-          opt.textContent = m.name;
-          majorSelect.appendChild(opt);
+          opt.value = c.id;
+          opt.textContent = c.name;
+          collegeSelect.appendChild(opt);
         });
       })
       .catch((err) => {
-        console.error("Failed to load majors:", err);
-        majorSelect.innerHTML = '<option value="" disabled>Failed to load majors</option>';
+        console.error("Failed to load colleges:", err);
+        collegeSelect.innerHTML = '<option value="" disabled>Failed to load colleges</option>';
       });
+
+    // Handle college change
+    collegeSelect.addEventListener("change", () => {
+      const collegeId = collegeSelect.value;
+      if (!collegeId) return;
+
+      majorSelect.disabled = false;
+      majorSelect.innerHTML = '<option value="" disabled selected>Loading majors...</option>';
+
+      apiRequest(`/majors?college_id=${collegeId}`)
+        .then((majors) => {
+          majorSelect.innerHTML = '<option value="" disabled selected>Select Major</option>';
+          majors.forEach((m) => {
+            const opt = document.createElement("option");
+            opt.value = m.id;
+            opt.textContent = m.name;
+            majorSelect.appendChild(opt);
+          });
+        })
+        .catch((err) => {
+          console.error("Failed to load majors:", err);
+          majorSelect.innerHTML = '<option value="" disabled>Failed to load majors</option>';
+        });
+    });
   }
 
   form.addEventListener("submit", async (e) => {
@@ -190,6 +215,13 @@ function wireStudentActions() {
         updateVariantTabs();
         renderTimetableGrid(document.getElementById("timetable"), currentVariants[activeVariantType].entries);
         
+        // Notify if variety is limited
+        const isIdentical = JSON.stringify(currentVariants.condensed.section_ids.sort()) === JSON.stringify(currentVariants.spread.section_ids.sort());
+        if (isIdentical && currentVariants.condensed.section_ids.length > 0) {
+           console.log("Limited schedule variety for this selection.");
+           // Optional: You could show a toast here if you had a toast system
+        }
+
         // Navigate to schedule section
         const schedTabBtn = document.querySelector('[data-section="schedule-section"]');
         if (schedTabBtn) schedTabBtn.click();

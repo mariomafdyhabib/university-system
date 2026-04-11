@@ -10,7 +10,8 @@ class Students(db.Model, UserMixin):
     name = db.Column(db.String(100), nullable=False)
     email = db.Column(db.String(100), unique=True, nullable=False)
     password_hash = db.Column(db.String(255), nullable=False)
-    major_id = db.Column(db.String(50))
+    college_id = db.Column(db.Integer, db.ForeignKey('colleges.college_id'))
+    major_id = db.Column(db.Integer, db.ForeignKey('majors.major_id'))
     year = db.Column(db.Integer)
     is_active = db.Column(db.Boolean, default=True)
 
@@ -39,10 +40,17 @@ class Instructors(db.Model):
     instructor_id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
 
+class Colleges(db.Model):
+    __tablename__ = 'colleges'
+    college_id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), unique=True, nullable=False)
+    majors = db.relationship('Majors', backref='college', lazy=True)
+
 class Majors(db.Model):
     __tablename__ = 'majors'
     major_id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), unique=True, nullable=False)
+    college_id = db.Column(db.Integer, db.ForeignKey('colleges.college_id'))
 
 class CourseSections(db.Model):
     __tablename__ = 'course_sections'

@@ -173,16 +173,44 @@ def generate_schedule_variants(student_id, course_ids):
             'total_span': total_span
         })
 
-    # Sort for variants
-    # Condensed: Min days, then min total_span
-    condensed = sorted(scored_combinations, key=lambda x: (x['num_days'], x['total_span']))[0]
+    # Filter for unique section combinations just in case
+    unique_combos = []
+    seen_combos = set()
+    for item in scored_combinations:
+        combo_key = tuple(sorted(item['section_ids']))
+        if combo_key not in seen_combos:
+            seen_combos.add(combo_key)
+            unique_combos.append(item)
+
+    # Sort candidates
+    # Condensed: Least number of days (compacted week)
+    by_condensed = sorted(unique_combos, key=lambda x: (x['num_days'], x['total_span']))
+    condensed = by_condensed[0]
     
-    # Spread: Max days, then max total_span (or just max total_span)
-    spread = sorted(scored_combinations, key=lambda x: (x['num_days'], x['total_span']), reverse=True)[0]
+    # Spread: Most number of days (classes spread across the week)
+    by_spread = sorted(unique_combos, key=lambda x: (x['num_days'], x['total_span']), reverse=True)
+    spread = by_spread[0]
     
-    # Moderate: Middle of the list after sorting by days
-    sorted_by_days = sorted(scored_combinations, key=lambda x: x['num_days'])
-    moderate = sorted_by_days[len(sorted_by_days) // 2]
+    # Moderate: Something in between if possible
+    # We look for a combo that has a different num_days from both condensed and spread
+    moderate = None
+    target_days = (condensed['num_days'] + spread['num_days']) // 2
+    
+    # Try to find one with target_days
+    for item in unique_combos:
+        if item['num_days'] == target_days and item['section_ids'] != condensed['section_ids'] and item['section_ids'] != spread['section_ids']:
+            moderate = item
+            break
+    
+    if not moderate:
+        # Just pick one that isn't condensed or spread if available
+        for item in unique_combos:
+            if item['section_ids'] != condensed['section_ids'] and item['section_ids'] != spread['section_ids']:
+                moderate = item
+                break
+    
+    if not moderate:
+        moderate = condensed # Fallback
 
     return {
         "condensed": condensed['section_ids'],
