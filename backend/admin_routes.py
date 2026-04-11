@@ -5,6 +5,7 @@ from database import db, Students, Courses, CourseSections, Instructors, Enrollm
 from course_upload import process_upload
 from scheduler import detect_system_conflicts
 import os
+import tempfile
 
 admin_bp = Blueprint('admin', __name__, url_prefix='/admin')
 
@@ -211,8 +212,8 @@ def upload_course_file():
 
     mode = request.form.get('mode', 'append')   # 'append' or 'replace'
 
-    # Save file temporarily
-    temp_path = os.path.join("/tmp", file.filename)
+    # Save file temporarily in a cross-platform way
+    temp_path = os.path.join(tempfile.gettempdir(), file.filename)
     file.save(temp_path)
 
     try:
