@@ -108,8 +108,12 @@ def generate_schedule_variants(student_id, course_ids):
     # 2. Backtracking to find all valid combinations
     all_valid_combinations = []
     course_id_list = list(course_sections_data.keys())
+    MAX_COMBINATIONS = 500  # Cap the search space for performance
 
     def find_combinations(index, current_sections, current_schedules):
+        if len(all_valid_combinations) >= MAX_COMBINATIONS:
+            return
+
         if index == len(course_id_list):
             all_valid_combinations.append(list(current_sections))
             return
@@ -151,66 +155,47 @@ def generate_schedule_variants(student_id, course_ids):
                     'end': parse_time(sch.end_time)
                 })
         
-        days = {}
+        days = set()
         for s in schedules:
-            if s['day'] not in days:
-                days[s['day']] = {'min': s['start'], 'max': s['end']}
-            else:
-                days[s['day']]['min'] = min(days[s['day']]['min'], s['start'])
-                days[s['day']]['max'] = max(days[s['day']]['max'], s['end'])
+            days.add(s['day'])
         
         num_days = len(days)
-        total_span = sum(d['max'] - d['min'] for d in days.values())
-        return num_days, total_span
-
-    # Score all combinations
-    scored_combinations = []
-    for combo in all_valid_combinations:
-        num_days, total_span = evaluate_schedule(combo)
-        scored_combinations.append({
-            'section_ids': combo,
-            'num_days': num_days,
-            'total_span': total_span
-        })
+        # Simplified total_span for ranking
+        return num_days
 
     # Filter for unique section combinations just in case
-    unique_combos = []
+    unique_scored = []
     seen_combos = set()
-    for item in scored_combinations:
-        combo_key = tuple(sorted(item['section_ids']))
+    for combo in all_valid_combinations:
+        combo_key = tuple(sorted(combo))
         if combo_key not in seen_combos:
             seen_combos.add(combo_key)
-            unique_combos.append(item)
+            num_days = evaluate_schedule(combo)
+            unique_scored.append({
+                'section_ids': combo,
+                'num_days': num_days
+            })
 
     # Sort candidates
-    # Condensed: Least number of days (compacted week)
-    by_condensed = sorted(unique_combos, key=lambda x: (x['num_days'], x['total_span']))
-    condensed = by_condensed[0]
+    # Condensed: Ideally 2-3 days if multiple courses, but fewest possible that is > 1
+    # If there's only one course, 1 day is fine. 
+    # If multiple courses, we prefer >= 2 days to avoid overloading.
+    by_days = sorted(unique_scored, key=lambda x: x['num_days'])
     
-    # Spread: Most number of days (classes spread across the week)
-    by_spread = sorted(unique_combos, key=lambda x: (x['num_days'], x['total_span']), reverse=True)
-    spread = by_spread[0]
-    
-    # Moderate: Something in between if possible
-    # We look for a combo that has a different num_days from both condensed and spread
-    moderate = None
-    target_days = (condensed['num_days'] + spread['num_days']) // 2
-    
-    # Try to find one with target_days
-    for item in unique_combos:
-        if item['num_days'] == target_days and item['section_ids'] != condensed['section_ids'] and item['section_ids'] != spread['section_ids']:
-            moderate = item
-            break
-    
-    if not moderate:
-        # Just pick one that isn't condensed or spread if available
-        for item in unique_combos:
-            if item['section_ids'] != condensed['section_ids'] and item['section_ids'] != spread['section_ids']:
-                moderate = item
+    condensed = by_days[0]
+    if len(course_ids) > 1:
+        # Try to find an option with at least 2 days
+        for x in by_days:
+            if x['num_days'] >= 2:
+                condensed = x
                 break
     
-    if not moderate:
-        moderate = condensed # Fallback
+    # Spread: Most number of days
+    spread = by_days[-1]
+    
+    # Moderate: Middle ground
+    mid_idx = len(by_days) // 2
+    moderate = by_days[mid_idx]
 
     return {
         "condensed": condensed['section_ids'],
