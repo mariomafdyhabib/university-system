@@ -43,6 +43,11 @@ def no_cache(response):
         response.headers['Expires'] = '0'
     return response
 
+@app.route('/reports/<path:path>')
+def send_report(path):
+    return send_from_directory(os.path.join(BASE_DIR, 'reports'), path)
+
+
 
 login_manager = LoginManager()
 login_manager.init_app(app)
